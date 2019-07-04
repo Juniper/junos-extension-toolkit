@@ -1,0 +1,81 @@
+//
+// Copyright 2018, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: JET Common Package
+package jnx.jet.common;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "18.4";
+
+// [brief]: Network address format used by server
+// [detail]: The format of network addresses that the server is to use when
+// responding to client requests.
+// [default]: ADDRESS_STRING
+enum AddressFormat {
+    // [brief]: Addreses in replies will be represented by strings
+    ADDRESS_STRING  = 0;
+
+    // [brief]: Addreses in replies represented by binary data in byte arrays
+    ADDRESS_BYTES   = 1;
+}
+
+// [brief]: Address family of a network address.
+// [detail]: Address family of a network address.
+// [default]: AF_UNSPECIFIED
+enum AfType {
+    // [brief]: Not specified
+    AF_UNSPECIFIED = 0;
+    // [brief]: IPv4 address family
+    AF_INET        = 1;
+    // [brief]: IPv6 address family
+    AF_INET6       = 2;
+    // [brief]: Ethernet MAC address family
+    AF_MAC         = 3;
+}
+
+// [brief]: IP Address representation
+// [detail]: An IP address, which may be either IPv4 or IPv6 and be respresented
+// by either a string or array of binary bytes.
+message IpAddress {
+    // [brief]: IP address format
+    oneof addr_format {
+        // [brief]: IP address string in standard format
+        string        addr_string     = 1;
+        // [brief]: Binary IP address in network-ordered array of bytes
+        bytes         addr_bytes      = 2;
+    }
+}
+
+// [brief]: Mac Address representation
+// [detail]: An ethernet MAC address, which may be respresented by either a
+// string or array of binary bytes.
+message MacAddress {
+    // [brief]: MAC Address format
+    oneof addr_format {
+        // [brief]: MAC address string in standard format
+        string        addr_string     = 1;
+
+        // [brief]: Binary MAC address in network-ordered array of bytes
+        bytes         addr_bytes      = 2;
+    }
+}
