@@ -1,0 +1,184 @@
+// Copyright (c) 2019, Juniper Networks, Inc.
+// All rights reserved.
+
+// This IDL defines objects that specify lightweight encapsulation and
+// decapsulation parameters for flexible tunnels. This type of tunnel
+// is intended to be controlled via JET applications for efficient,
+// high-scale dynamic tunneling. The tunnels created by these objects
+// do not have control plane functionality, i.e., protocols or other
+// control plane features cannot run over these interfaces, but they are
+// sent to the forwarding plane where forwarding state is instantiated for
+// them.
+//
+// In the context of this API, an "attribute" is a single parameter of
+// the tunnel encapsulation/decapsulation (e.g. source port), while
+// a "profile" the complete set of attributes that fully defines all
+// required parameters needed to encapsulate or decapsulate traffic.
+
+syntax = "proto3";
+
+// This is part of the routing package.
+package jnx.jet.routing.rib;
+
+// Depends on common JNX and RPD API definitions
+
+// [version]: 0.0.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+// [version]: 0.0.0
+import "jnx_routing_base_types.proto";
+// [version]: 0.0.0
+import "google/protobuf/wrappers.proto";
+
+
+//[changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+option (jnx.jet.common.junos_release) = "19.3";
+
+// [brief]: VXLAN tunnel attributes.
+// [detail]: A set of VXLAN flexible tunnel attributes contains the encapsulation and/or
+// decapsulation parameters specific to a VXLAN flexible tunnel.
+//
+// A VXLAN decapsulation tunnel is considered unique only if the full tuple
+// of FTI interface, VNI, source prefix/length, and destination port is
+// unique from other decapsulation tunnels. Adding or updating VXLAN
+// decapsulation tunnel with conflicting attributes will result in an error.
+message VxlanTunnelAttributes {
+
+    // [mandatory]: required for both encapsulation and decapsulation.
+    // [brief]: 24 bit VXLAN Network Identifier (VNI).
+    // [range]: [1:16777214].
+    uint32              vni = 1;
+
+    // [mandatory]: required for both encapsulation and decapsulation.
+    // [brief]: Source address prefix.
+    // [detail]: Outer source address prefix for the encapsulated traffic.
+    // Must be IPv4 or IPv6.
+    jnx.jet.routing.base.NetworkAddress       source_prefix = 2;
+
+    // [mandatory]: required for both encapsulation and decapsulation.
+    // [brief]: Prefix length of source address.
+    // [detail]: Source address prefix length.
+    // For encapsulation, it must be the host
+    // address prefix length.
+    // prefix length will be 32 for IPv4, 128 for IPv6.
+    uint32              source_prefix_len = 3;
+
+    // [brief]: Source UDP port range.
+    // [detail]: Outer source UDP port range. The source port for each route will be
+    // picked from the given range.
+    // REQUIRED for encapsulations, OPTIONAL and ignored for decapsulations.
+    // [range]: [0:65535].
+    jnx.jet.common.NumericRange source_udp_port_range = 4;
+
+    // [brief]: Source MAC address.
+    // [detail]: Source MAC address will be ignored. OPTIONAL. JUNOS will set the
+    // source MAC by default for encapsulations.
+    // [default]: 00:00:5e:00:52:01.
+    jnx.jet.common.MacAddress  source_mac = 5;
+
+    // [brief]: Destination address
+    // [detail]: Outer destination address for the encapsulated traffic.
+    // Must be the IPv4 or IPv6 address of a local interface.
+    // REQUIRED for encapsulations, OPTIONAL and ignored for decapsulations.
+    jnx.jet.routing.base.NetworkAddress      destination_address = 6;
+
+    // [mandatory]: required for both encapsulation and decapsulation.
+    // [brief]: Destination UDP port.
+    // [Range]: [0:65535]
+    // (inclusive).
+    uint32              destination_udp_port = 7;
+
+    // [brief]: Destination MAC address.
+    // [detail]: Destination MAC address, a 48-bit MAC value. OPTIONAL.
+    // If not specified, JUNOS will set the destination MAC by
+    // default for encapsulations.
+    // [default_value]: 00:00:5e:00:52:00.
+    jnx.jet.common.MacAddress  destination_mac = 8;
+
+    // [brief]: VXLAN flag.
+    // [detail]: VXLAN Flags are 8 bits of flags as specified in RFC7348.
+    // [default_value]: The default RFC7348 value of 0x08 will
+    // be used in encapsulations.
+    google.protobuf.UInt32Value flags = 9;
+
+    // [brief]: VXLAN header fields reserved as of RFC7348.
+    // [detail]: VXLAN header fields reserved as defined in RFC7348.
+    // [default]: Zero.
+    oneof vxlan_header_reserved {
+        // [brief]: VXLAN header reserved fields as defined in RFC7348.
+        // [detail]: VXLAN header fields reserved as defined in RFC7348.
+        // [default]: Zero.
+        Rfc7348VxlanReserved rfc7348_reserved = 10;
+    }
+}
+
+// [brief]: VXLAN header reserved fields as of RFC7348.
+// [detail]: VXLAN header reserved fields as defined in RFC7348.
+message Rfc7348VxlanReserved {
+    // [brief]: VXLAN 24-bit reserved field as specified in RFC7348.
+    // [detail]: This is the RFC7348 VXLAN header 24-bit reserved field that
+    // follows the VXLAN flags and preceeds the VNI (bits 8-31).
+    // This field is ignored for decapulation profiles.
+    // If not set, the bits will be set to all zeros.
+    // If set, only the lower 24-bits may be non-zero.
+    // [range]: [0:(2^24-1)]
+    uint32              reserved_bits_8_31 = 1;
+
+    // [brief]: VXLAN 8-bit reserved field as specified in RFC7348.
+    // [detail]: This is the RFC7348 VXLAN header 8-bit reserved field that
+    // follows the VNI (bits 55-63).
+    // This field is ignored for decapulation profiles.
+    // [range]: [0:255]
+    uint32              reserved_bits_55_63 = 2;
+}
+
+// [brief]: Tunnel attributes.
+// [detail]: Encapsulation/Decapsulation attributes for various types of tunnels.
+message TunnelAttributes {
+    // [brief]: Tunnel types supported by flexible tunnels.
+    oneof tunnel_attributes_type {
+        // [brief]: VXLAN tunnels.
+        VxlanTunnelAttributes    vxlan      = 1;
+    }
+}
+
+// [brief]: The action performed for the tunnel.
+// [detail]: The action performed for the tunnel.
+// [default]: ENCAPSULATE.
+enum TunnelActionType {
+    // [brief]: Use associated TunnelAttributes to encapsulate packets.
+    ENCAPSULATE           = 0;
+    // [brief]: Use associated TunnelAttributes to decapsulate packets.
+    DECAPSULATE           = 1;
+}
+
+// [brief]: Flexible tunnel profile.
+// [detail]: A flexible tunnel profile contains a set encapsulation parameters for a
+// flexible tunnel. It may specify an encapsulation or decapsulation.
+message FlexibleTunnelProfile {
+
+    // [brief]: Flexible tunnel profile name.
+    // [detail]: A unique client-assigned name for this profile.
+    // REQUIRED when when used with any RPC from the flexible_tunnel_service.
+    // OPTIONAL when FlexibleTunnelProfile is used in RouteGateway.
+    string                   name = 1;
+
+    // [mandatory]:
+    // [brief]: The action that this profile will be used for.
+    // [detail]: The action that this profile will be used for: encapsulate,
+    // decapsulate.
+    TunnelActionType         action = 2;
+
+    // statistics, policing, filtering, and default encapsulation parameters.
+    // [mandatory]:
+    // [brief]: Name of the anchoring tunnel interface.
+    // [detail]: Name of the anchoring tunnel interface to use for
+    string                   interface_name = 3;
+
+    // [mandatory]:
+    // [brief]: The encapsulation or decapsulation parameters defining the profile.
+    TunnelAttributes         attributes = 4;
+}
+
