@@ -1,0 +1,499 @@
+/*
+ * Public APIs for the routing interfaces service.
+ *
+ * This IDL defines the APIs for the routing interfaces service.
+ *
+ * The APIs are used to receive routing interface events and
+ * query routing interfaces on a router.
+ */
+
+ 
+/*
+ *  proto3 is recommended
+ */
+syntax = "proto3";
+
+
+/*
+ * This is part of the routing package.
+ */
+package routing;
+
+
+/*
+ * Depends on common JNX and RPD API definitions
+ */
+import "jnx_addr.proto";
+import "jnx_base_types.proto";
+import "prpd_common.proto";
+
+
+/**
+ * Routing interface status
+ *
+ * CHANGED, UP, DOWN, and DELETED are applicable
+ * to RoutingInterfaceNotificationResponse.
+ * UP and DOWN are applicable to RoutingInterfaceGetResponse,
+ */
+enum RoutingInterfaceStatus {
+
+    /** Attribute changed */
+    RT_INTF_CHANGED = 0;     
+
+    /** Up */ 
+    RT_INTF_UP      = 1;
+
+    /** Down */
+    RT_INTF_DOWN    = 2; 
+
+    /** Deleted */
+    RT_INTF_DELETED = 3;
+}
+
+
+/**
+ * Routing interface Address
+ */
+message RoutingInterfaceAddress {
+
+    /**
+     * IPv4 or v6 address of the interface
+     * REQUIRED 
+     */
+    NetworkAddress address            = 1;
+
+    /**
+     * Prefix length of the address
+     * REQUIRED
+     */
+    uint32 prefix_length              = 2;
+
+    /**
+     * Indicates whether this is the primary
+     * IP adddress of the interface
+     * REQUIRED
+     */
+    bool is_primary                   = 3;
+}
+
+
+/**
+ * Routing interface entry
+ *
+ * This entry contains the information of a
+ * routing interface. It is used by
+ * RoutingInterfaceNotificationResponse and
+ * RoutingInterfaceGetResponse.
+ *
+ * In a RoutingInterfaceNotificationResponse
+ * notifying of a CHANGED or UP status, and in a
+ * RoutingInterfaceGetResponse, all attributes are
+ * applicable.
+ *
+ * In a RoutingInterfaceNotificationResponse
+ * notifying of a DOWN or DELETED status, only the  
+ * name and status attributes are applicable.
+ */
+message RoutingInterfaceEntry {
+
+    /**
+     * Name in the format of type-fpc/pic/port.logical
+     * REQUIRED
+     */
+    string name                                = 1;
+
+    /**
+     * Interface index
+     * OPTIONAL (defaults to 0)
+     */
+    uint32 index                               = 2;
+
+    /**
+     * Status
+     * REQUIRED
+     */
+    RoutingInterfaceStatus status              = 3;
+
+    /**
+     * Bandwidth in bps
+     * OPTIONAL (defaults to 0)
+     */
+    uint64 bandwidth                           = 4;
+
+    /**
+     * MTU
+     * OPTIONAL (defaults to 0)
+     */
+    uint32 mtu                                 = 5;
+    
+    /**
+     * Addresses
+     * There may be none, one or multiple addresses. 
+     * OPTIONAL (defaults to none)
+     */
+    repeated RoutingInterfaceAddress addresses = 6;
+}
+
+
+/** 
+ * Routing interface service initialize request.
+ *
+ * A client sends this request to initialize the service.
+ */
+message RoutingInterfaceInitializeRequest {
+}
+
+
+/**
+ * Routing interface service initialize response.
+ *
+ */
+message RoutingInterfaceInitializeResponse {
+
+    /**
+     * Response status
+     */
+    enum RoutingInterfaceInitializeStatusCode {
+
+        /** Request successfully completed */
+    	SUCCESS_COMPLETED                   = 0;
+
+    	/**
+	 * Request successfully completed, with
+      	 * a preexisting client of the same client
+     	 * identifier being rebound.
+     	 */
+    	SUCCESS_REBOUND                     = 1;
+
+    	/** Request failed due to an internal error */
+    	INTERNAL_ERROR                      = 2;
+
+    	/** Service is already initialized */
+    	ALREADY_INITIALIZED                 = 3;
+    }
+    
+    /**
+     * Top level return code
+     * REQUIRED
+     */
+    jnxBase.StatusCode code                       = 1;
+    
+    /**
+     * Sub code
+     * REQUIRED
+     */
+    RoutingInterfaceInitializeStatusCode sub_code = 2;
+}	
+
+
+/**
+ * Routing interface get request.
+ *
+ * A client sends this request to query an individual interface. 
+ */
+message RoutingInterfaceGetRequest {
+
+    /**
+     * Key
+     * REQUIRED
+     */
+    oneof Key {
+    
+    	/** Name */
+    	string name                            = 1;
+
+	/** Index */
+	uint32 index                           = 2;
+    }
+    
+    /** 
+     *  The format of IP addresses to be used in response.
+     *  OPTIONAL (defaults to string).
+     */
+    jnxBase.AddressFormat address_format = 3;
+}
+
+
+/**
+ * Routing interface get response.
+ */
+message RoutingInterfaceGetResponse {
+
+    /**
+     * Response status
+     */
+     enum RoutingInterfaceGetStatusCode {
+
+         /** Request completed successfully */
+    	 SUCCESS_COMPLETED       = 0;
+
+    	 /** Request failed due to an internal error */
+    	 INTERNAL_ERROR          = 1;
+
+    	 /** Service is not initialized */
+    	 NOT_INITIALIZED         = 2;
+
+    	 /** Interface name and index are invalid */
+    	 INVALID_INDEX_AND_NAME  = 3;
+
+    	 /** Interface was not found */
+    	 NOT_FOUND               = 4;
+    }
+
+    /**
+     * Top level return code
+     * REQUIRED
+     */
+    jnxBase.StatusCode code                = 1;
+    
+    /**
+     * Sub code
+     * REQUIRED
+     */
+    RoutingInterfaceGetStatusCode sub_code = 2;
+
+    /**
+     * Interface entry
+     * OPTIONAL; Contains an empty entry in error conditions
+     */
+    RoutingInterfaceEntry entry            = 3;
+}
+
+
+/**
+ * Routing interface notification register request.
+ *
+ * A client sends this request to register for interface
+ * event notifications, which will be streamed to the
+ * client via RoutingInterfaceNotificationResponses.
+ */
+message RoutingInterfaceNotificationRegisterRequest {
+
+    /** 
+     *  The format for IP addresses to be used in response.
+     *  OPTIONAL (defaults to string).
+     */
+    jnxBase.AddressFormat address_format = 1;
+}
+
+
+/**
+ * Routing interface notification response.
+ */
+message RoutingInterfaceNotificationResponse {
+
+    /**	
+     * Response status
+     */
+     enum RoutingInterfaceNotificationStatusCode {
+         /** Request successfully completed */
+     	 SUCCESS_COMPLETED             = 0;
+
+     	 /** Request failed due to an internal error */
+     	 INTERNAL_ERROR      = 1;
+
+     	 /** Service is not initialized */
+     	 NOT_INITIALIZED     = 2;
+
+     	 /** Notification is already registered. */
+     	 ALREADY_REGISTERED  = 3;
+    }
+
+    /**
+     * Top level return code
+     * REQUIRED
+     */
+    jnxBase.StatusCode code                         = 1;
+    
+    /**
+     * Sub code
+     * REQUIRED
+     */
+    RoutingInterfaceNotificationStatusCode sub_code = 2;
+
+    /**
+     * Interface entries
+     * OPTIONAL; May contain 0, 1 or multiple entries
+     */
+    repeated RoutingInterfaceEntry entries          = 3;
+}	
+
+
+/** 
+ * Routing interface notification unregister request.
+ *
+ * A client sends this request to unregister for interface
+ * event notifications.
+ */
+message RoutingInterfaceNotificationUnregisterRequest {
+}
+
+
+/**
+ * Routing interface notification unregister response.
+ */
+message RoutingInterfaceNotificationUnregisterResponse {
+
+    /**
+     * Notification unregister response status
+     */
+    enum RoutingInterfaceNotificationUnregisterStatusCode {
+
+        /** Request successfully completed */
+    	SUCCESS_COMPLETED                   = 0;
+
+    	/** Request failed due to an internal error */
+    	INTERNAL_ERROR                      = 1;
+
+    	/** Service is not initialized */
+    	NOT_INITIALIZED                     = 2;
+
+    	/** Notification is not registered */
+    	NOTIFICATION_NOT_REGISTERED         = 3;
+    }
+    
+    /**
+     * Top level return code
+     * REQUIRED
+     */
+    jnxBase.StatusCode code                                   = 1;
+    
+    /**
+     * Sub code
+     * REQUIRED
+     */
+    RoutingInterfaceNotificationUnregisterStatusCode sub_code = 2;
+}	
+
+
+/** 
+ * Routing interface notification refresh request.
+ *
+ * A client sends this request to receive a full flash
+ * of all interfaces. RoutingInterfaceNotificationResponses
+ * carrying the information of all the interfaces will
+ * be streamed to the client. 
+ */
+message RoutingInterfaceNotificationRefreshRequest {
+}
+
+
+/**
+ * Routing interface notification refresh response.
+ */
+message RoutingInterfaceNotificationRefreshResponse {
+
+    /**
+     * Notification refresh response status
+     */
+    enum RoutingInterfaceNotificationRefreshStatusCode {
+
+        /** Request successfully completed */
+    	SUCCESS_COMPLETED                   = 0;
+
+    	/** Request failed due to an internal error */
+    	INTERNAL_ERROR                      = 1;
+
+    	/** Service is not initialized */
+    	NOT_INITIALIZED                     = 2;
+
+    	/** Notification is not registered */
+    	NOTIFICATION_NOT_REGISTERED         = 3;
+    }
+    
+    /**
+     * Top level return code
+     * REQUIRED
+     */
+    jnxBase.StatusCode code                                = 1;
+    
+    /**
+     * Sub code
+     * REQUIRED
+     */
+    RoutingInterfaceNotificationRefreshStatusCode sub_code = 2;
+}	
+
+
+/**
+ * Routing interfaces service
+ */
+service RoutingInterface { 
+
+    /**
+     * Service initialize
+     *
+     * A client must first use this RPC to initialize and connect
+     * to the service, before issuing other RPCs.
+     */
+    rpc RoutingInterfaceInitialize (RoutingInterfaceInitializeRequest)
+        returns (RoutingInterfaceInitializeResponse) {}
+
+    /**
+     * Get a routing interface by name or index
+     *
+     * A client may use this RPC to query an individual routing interface
+     * at any time. The client should already know the name or index of
+     * the interface via notification or any other method.
+     */
+    rpc RoutingInterfaceGet (RoutingInterfaceGetRequest) 
+        returns (RoutingInterfaceGetResponse) {}
+
+    /** 
+     * Notification register
+     *
+     * Request to receive asynchronous notifications of
+     * of routing interface CHANGED, UP, DOWN and DELETED
+     * status events.
+     *
+     * After a RoutingInterfaceNotificationRegisterRequest,
+     * an initial RoutingInterfaceNotificationResponse is sent
+     * immediately to the client, as a confirmation for the
+     * request. This response may or may not carry an interface.
+     *
+     * Then, RoutingInterfaceNotificationResponses are
+     * sent to the client, as a full flash of all the interfaces.
+     *
+     * Subsequently, a RoutingInterfaceNotificationResponse
+     * will be sent to the client upon a CHANGED, UP, DOWN,
+     * or DELETED status event of an interface.
+     *
+     * Notification compression:
+     * When a status event of an interface is pending for a client
+     * to be notified of, a new status event happens.
+     * As a net result, a single notification representing the
+     * latest status and attributes of the interface is sent to
+     * the client. This should only happen when consecutive events
+     * happen with extremely small intervals. Examples:
+     *
+     * [1] When a CHANGED event is pending, an UP/DOWN
+     *     event happens. Hence, an UP/DOWN notification
+     *     is sent.
+     * [2] When a CHANGED/UP/DOWN event is pending, a DELETED
+     *     event happens. Hence, a DELETED notification
+     *     is sent.
+     * [3] When an UP/DOWN event if pending, a CHANGED
+     *     event happens. Hence, only an UP/DOWN notification
+     *     is sent.
+     */
+    rpc RoutingInterfaceNotificationRegister (RoutingInterfaceNotificationRegisterRequest)
+        returns (stream RoutingInterfaceNotificationResponse) {}
+
+    /** 
+     * Notification unregister
+     *
+     * Request to stop receiving notifications (i.e. RoutingInterfaceNotificationResponses)
+     * of routing interface events.
+     */
+    rpc RoutingInterfaceNotificationUnregister (RoutingInterfaceNotificationUnregisterRequest)
+        returns (RoutingInterfaceNotificationUnregisterResponse) {}
+
+    /** 
+     * Notification refresh
+     *
+     * Request to receive a refresh of notifications (i.e. RoutingInterfaceNotificationResponses)
+     * of all routing interfaces, with their current status and attributes.
+     */
+    rpc RoutingInterfaceNotificationRefresh (RoutingInterfaceNotificationRefreshRequest)
+        returns (RoutingInterfaceNotificationRefreshResponse) {}
+}
