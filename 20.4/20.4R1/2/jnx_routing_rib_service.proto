@@ -1,0 +1,842 @@
+//
+// Copyright 2019, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+//[brief]: This package supports the RIB services.
+package jnx.jet.routing.rib;
+
+// [version]: 0.0.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+// [version]: 0.0.0
+import "jnx_routing_base_types.proto";
+// [version]: 0.0.0
+import "google/protobuf/wrappers.proto";
+// [version]: 0.0.0
+import "jnx_routing_flexible_tunnel_profile.proto";
+
+//[changes]: Addition of BANDWIDTH_USAGE_INVALID field to StatusCode.
+option (jnx.jet.common.japi_version) = "0.2.1";
+
+option (jnx.jet.common.junos_release) = "19.4";
+
+//[brief]: RIB services.
+//[detail]: JET RPC service providing route operations to manage rib services.
+service Rib {
+
+    // [brief]: Route Initialization operation.
+    // [detail]: Initializes the client with default preferences and
+    // response address format.
+    //
+    // Route initialization is mandatory to be called before invoking
+    // any other RIB API's.
+    //
+    // Route initialization request contains the default address format to be set
+    // and default preference values.
+    //
+    // Initialization API can be called multiple times and the default parameters
+    // will be updated with the latest values from the initialization
+    // request.
+    //
+    // Route initialization API returns the status of the initialization along
+    // with the detailed text message and the number of routes present in RIB owned by
+    // previous sessions of the given client ID.
+    rpc RouteInitialize (RouteInitializeRequest) returns (RouteInitializeResponse) {}
+
+    // [brief]: Route clean up operation.
+    // [detail]: RouteCleanup cleans all the routes added by the
+    // particular client ID.
+    // The API always returns the final status and the textual detailed message.
+    rpc RouteCleanup (RouteCleanupRequest) returns (RouteCleanupResponse) {}
+
+    // [brief]: Route Add operation
+    // [detail]: Add a static route to the routing table.
+    // RouteAdd may be called multiple times for the same prefix to add
+    // multiple paths with distinct cookie for the same destination.
+    // If a matching route already exists in the given table, then an error
+    // will be returned.
+    // RouteUpdateRequest may contain from one to 1000 routes to be added.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully created
+    // prior to any error or full completion of the request.
+    rpc RouteAdd (RouteUpdateRequest) returns (RouteSetOperResponse) {}
+
+    // [brief]: Route Modify operation
+    // [detail]: Modify an existing programmed static route in the routing
+    // table. For each route in the request, if the key is matched, the
+    // matched route will be updated with the supplied route attributes.
+    // If a matching route does not exist in the given table, then an error
+    // will be returned.
+    // RouteUpdateRequest may contain from one to 1000 routes to be modified.
+    // If the request contains multiple routes, the routes will be processed
+    // in the order given and the first error encountered will cause the
+    // request to abort.
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteModify (RouteUpdateRequest) returns (RouteSetOperResponse) {}
+
+    // [brief]: Route Update operation
+    // [detail]: Create a new static route if a matching route does not exist,
+    // OR modify an existing static route if it is already present in the
+    // routing table.
+    // RouteUpdateRequest may contain from one to 1000 routes to be added.
+    // If the request contains multiple routes, the routes will be processed
+    // in the order given and the first error encountered will cause the
+    // request to abort.
+    // The API always returns the final status (success or first error
+    //  encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteUpdate (RouteUpdateRequest) returns (RouteSetOperResponse) {}
+
+    // [brief]: Route Delete operation
+    // [detail]: Delete a static route from the routing table.
+    // RouteDelete may be called multiple times for the same prefix
+    // to delete multiple paths with distinct path_cookie for the same
+    // destination. (NOTE: cookie support not yet implemented)
+    // The request may contain from one to 1000 routes to be deleted.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteDelete (RouteDeleteRequest) returns (RouteDeleteResponse) {}
+
+    // [brief]: Route Get operation
+    // [detail]: Lookup a route from the routing table.
+    //  Match fields that are not specified or that
+    //  may match more than one route (e.g. a less-specific destination
+    //  prefix) may result in multiple routes being returned in the replies.
+    //  Responses are bulked for performance and the client can specify
+    //  maximum number of route entries that JUNOS can send in one response
+    //  message using route_count field. JUNOS may choose to pack less
+    //  number of entries than that client has specified.
+    //  Multiple route entries matching a given route prefix
+    //  may be be counted as one (if its last one in the response) and may
+    //  result in exceeding the specified route count.
+    //  Replies are streamed until all match routes have been sent. The
+    //  client will receive a final null message once all routes have
+    //  been received.
+    //  The server's walk of search results is not atomic so route changes
+    //  during streaming and consumption of replies may or may not be
+    //  reflected in the results.
+    rpc RouteGet (RouteGetRequest) returns (stream RouteGetResponse) {}
+
+    // [brief]: Subscribe for the route entries of a table.
+    // [detail]: When clients subscribe for a table all routes that passes
+    // policy are streamed to the client. After this the routes that get added
+    // or changed or deleted are streamed.
+    // Clients can subscribe to more than one table for route monitoring. Each
+    // of these subscriptions will have a different stream on which the routes
+    // will be streamed.
+    // Clients can also change subscription parameters for the table. In this
+    // case the parameter will be re-applied for the table and the resulting
+    // routes of the table are streamed. E.g. If policy is added to the
+    // subscription to notify only static routes, then all non static routes
+    // that were sent before are re-sent with a delete subscription operation.
+    // Subsequent subscription messages for the table will contain only static
+    // routes.
+    // For the above case, streaming will happen on the new stream created for
+    // the fresh Subscribe request sent. Streaming of routes on the old stream
+    // will stop.
+    // The response is sent as stream and will be sent as long as
+    // subscription is valid. Once the subscription is deleted,
+    // then this streaming will be stopped.
+    rpc RouteSubscribe (RouteSubscribeRequest)
+	            returns (stream RouteSubscribeResponse) {}
+}
+// [brief]: Response sub_code.
+// [detail]: Response sub_code for route add/modify/update/delete/get/subscribe.
+// [default]: SUCCESS.
+enum StatusCode {
+    // [brief]: Request successfully completed in full.
+    SUCCESS                 = 0;
+
+    // [brief]: Request failed due to an internal server error.
+    INTERNAL_ERROR          = 1;
+
+    // [brief]: The route service has not been initialized.
+    NOT_INITIALIZED         = 2;
+
+    // [brief]: Request did not result in any operations.
+    NO_OP                   = 3;
+
+    // [brief]: Request contained too many operations.
+    TOO_MANY_OPS            = 4;
+
+    // [brief]: Request contained an invalid table.
+    TABLE_INVALID           = 5;
+
+    // [brief]: Request contained a table that was not ready for operations.
+    TABLE_NOT_READY         = 6;
+
+    // [brief]: Request contained an invalid destination address prefix.
+    PREFIX_INVALID          = 7;
+
+    // [brief]: Request contained a destination prefix length too short for the
+    // supplied address/NLRI.
+    PREFIX_LEN_TOO_SHORT    = 8;
+
+    // [brief]: Request contained a destination prefix length too long for the
+    //  supplied address/NLRI.
+    PREFIX_LEN_TOO_LONG     = 9;
+
+    // [brief]: The server did not have a valid gateway associated with the
+    // client.
+    GATEWAY_INVALID         = 10;
+
+    // [brief]: Request contained an invalid nexthop.
+    NEXTHOP_INVALID         = 11;
+
+    // [brief]: Request contained a nexthop with an invalid address.
+    NEXTHOP_ADDRESS_INVALID = 12;
+
+    // [brief]: Request to add paths exceeding maximum ECMP paths for a
+    // destination.
+    NEXTHOP_LIMIT_EXCEED    = 13;
+
+    // [brief]: Request contains a route that is already present in the table.
+    ROUTE_EXISTS            = 14;
+
+    // [brief]: Request contains a route that is NOT present in the table.
+    ROUTE_NOT_FOUND         = 15;
+
+    // [brief]: Request contains an invalid protocol. Only PROTO_UNSPECIFID
+    // or PROTO_BGP_STATIC are allowed in route change operations.
+    PROTOCOL_INVALID        = 16;
+
+    // [brief]: Request contains a route that is NOT present in the table.
+    ROUTE_ADD_FAILED        = 17;
+
+    // [brief]: The protocol daemon is not initialized and ready to accept
+    // route change operations.
+    NOT_READY		    = 18;
+
+    // [brief]: Request cannot be serviced until current requests are processed.
+    TRY_AGAIN               = 19;
+
+    // [brief]: Request contains a route_count that exceeds the max of 1000.
+    ROUTE_COUNT_INVALID	    = 20;
+
+    // [brief]: Request contains a parameter that is not currently supported.
+    REQUEST_UNSUPPORTED     = 21;
+
+    // [brief]: Request contains a parameter that is not valid.
+    REQUEST_INVALID	    = 22;
+
+    // [brief]: Interface name is not valid.
+    INTERFACE_INVALID	    = 23;
+
+    // [brief]: Invalid parameters for Route subscribe.
+    // [detail]:Invalid parameters for Route subscribe. This can be returned
+    // if a wrong value is set in the subscription or requested operation is
+    // invalid. For e.g. this error is returned when Route Subscribe
+    // API is called with operation > SUBSCRIBE_DEL.
+    // This error will also be returned if a subscribe API is called for an
+    // existing subscribe with a modified value of subscribe_response_route_count.
+    ROUTE_SUBSCRIBE_OPERATION_INVALID = 24;
+
+    // [brief]: This error is returned when Route subscribe API with delete
+    // operation is called for a table which was not subscribed for
+    // using a add operation.
+    ROUTE_SUBSCRIBE_ENOENT  = 25;
+
+    // [brief]: Route Subscribe Policy invalid.
+    ROUTE_SUBSCRIBE_POLICY_INVALID = 26;
+
+    // [brief]: Route Subscribe request has invalid
+    // subscribe_response_route_count.
+    // This error is also returned if subscribe_response_route_count is changed.
+    // for an existing subscription.
+    ROUTE_SUBSCRIBE_RESPONSE_ROUTE_COUNT_INVALID = 27;
+
+    // [brief]: Route subscribe registration for same table with same params exist.
+    ROUTE_SUBSCRIBE_EXISTS  = 28;
+
+    // [brief]: MPLS Label value is invalid.
+    MPLS_LABEL_INVALID	    = 29;
+
+    // [brief]: MPLS Label stack operation(s) is invalid.
+    MPLS_ACTION_INVALID	    = 30;
+
+    // [brief]: Client is already initialized.
+    ALREADY_INITIALIZED	    = 31;
+
+    // [brief]: Disconnected client reconnects back.
+    SUCCESS_REBOUND	    = 32;
+
+    // [brief]: Invalid use of a flexible tunnel profile.
+    FLEXIBLE_TUNNEL_INVALID  = 33;
+
+    // [brief]: Bandwidth used but not set for all gateways.
+    BANDWIDTH_USAGE_INVALID = 34;
+}
+
+// [brief]: The route entry fields that uniquely identify a route.
+// [detail]: Route entry's unique fields typically used to match the route.
+message RouteMatch {
+    // [mandatory]:
+    // [brief]: Address of the route.
+    jnx.jet.routing.base.NetworkAddress dest_prefix	= 1;
+
+    // [mandatory]:
+    // [brief]: Route prefix length.
+    uint32                              dest_prefix_len = 2;
+
+    // [mandatory]:
+    // [brief]: Routing table to which the route belongs.
+    jnx.jet.routing.base.RouteTable     table	        = 3;
+
+    // [brief]:  Differentiate routes of same address set by application.
+    // [default value]: 0.
+    uint64                              cookie	        = 4;
+}
+
+// [brief]: Route gateway message.
+// [detail]: Route gateway contains the parameters which are needed to forward
+// traffic to next router/host. Consists of gateway address, local address and
+// interface.
+message RouteGateway {
+    // [mandatory]:
+    // [brief]: Address of nexhop gateway or peer.
+    jnx.jet.routing.base.NetworkAddress gateway_address  = 1;
+
+    // [brief]: Outgoing local interface name (IFL).
+    // [detail]: If provided, the router next-hop is built.
+    // If not provided, an indirect next-hop is built.
+    // OPTIONAL
+    string                              interface_name   = 2;
+
+    // [brief]: Local interface address to be used.
+    // [detail]: Local address is used to select a suitable interface.
+    // This is useful when app is not aware of the outgoing interface,
+    // but knows the IP address of the interface.
+    // OPTIONAL
+    jnx.jet.routing.base.NetworkAddress local_address    = 3;
+
+    // [brief]: MPLS label stack.
+    // [detail]: List of Stack Entries with each with an associated action
+    // Entries are ordered in the same order as actions to be performed.
+    //  OPTIONAL
+    jnx.jet.routing.base.LabelStack     label_stack      = 4;
+
+    // [brief]: weight
+    // [detail]: For a route next-hop with next-hop gateways, the gateway
+    // with the lowest weight is treated as primary path. If the primary
+    // next-hop goes down, the forwarding plane will automatically route
+    // traffic  via the secondary next-hop gateway.
+    // When there are multiple next-hop gateways entries with same lowest
+    // weight, all of them are added to the ECMP nexthop if ECMP is configured.
+    // If weight is 0, it's considered as not specified.
+    // Valid value range is 1-65535.
+    // The default weight is 0 if it is not specified.
+    // OPTIONAL
+    uint32		 weight		= 5;
+
+    // [brief]: bandwidth
+    // [detail]: When a route next-hop with multiple next-hop gateways,
+    // applying ECMP distributes traffic evenly across all the next-hop
+    // gateways.
+    // If traffic needs to be distributed unequally across multiple gateways,
+    // the bandwidth field is used to compute balance coefficients that
+    // determine the proportion of traffic sent via each gateway.
+    // Bandwidth is not an absolute value, but is relative. The proportion of
+    // traffic assigned to each gateway is determined using the following
+    // formula:
+    // (gateway bandwidth)/ (sum of bandwidths for all gateways).
+    // Valid range is 0 and above. Negative values are treated as 0.
+    // Bandwidth will be ignored for next-hops with only a single
+    // usable gateway. If bandwidth is set for one gateway, then it
+    // must be set for all gateways.
+    // The default bandwidth is 0 if it is not specified.
+    // OPTIONAL
+    float		 bandwidth	= 6;
+
+    // [brief]: Flexible tunnel profile.
+    // [detail]: Flexible encapsulation attributes specified directly with the
+    // destination route.
+    // TunnelType ENCAPSULATE or ENCAP_AND_DECAPSULATE.
+    // OPTIONAL. If specified, these override any other gateway parameters.
+    FlexibleTunnelProfile flexible_tunnel_profile = 7;
+}
+
+// [brief]: Route next hop.
+// [detail]: When a data traffic arrives on a router, route nexthop indicates
+// the next router(s) to which the traffic is to be forwarded. This consists of
+// list of gateways.
+message RouteNexthop {
+    // [brief]: List of nexthop gateways.
+    // [detail]:  JUNOS currently allows up to 64 gateways per next-hop.
+    // defaults to a next-hop that blackholes the traffic
+    // OPTIONAL.
+    repeated   RouteGateway gateways  = 1;
+}
+
+// [brief]: Route Preferences.
+// [detail]: Route Preferences of the various route types
+// [default]: RTPREF_DIRECT
+enum RoutePreference {
+    option allow_alias  = true;
+    // [brief]: Routes to interfaces
+    RTPREF_DIRECT       = 0;
+    // [brief]: Static routes
+    RTPREF_STATIC       = 5;
+    // [brief]: OSPF Internal route
+    RTPREF_OSPF         = 10;
+    // [brief]: IS-IS level 1 route
+    RTPREF_LABELED_ISIS = 14;
+    // [brief]: IS-IS level 1 route
+    RTPREF_ISIS_L1      = 15;
+    // [brief]: IS-IS level 2 route
+    RTPREF_ISIS_L2      = 18;
+    // [brief]: Berkeley RIP
+    RTPREF_RIP          = 100;
+    // [brief]: Berkeley RIPng
+    RTPREF_RIPNG        = 100;
+    // [brief]: Internet Gatway Mgmt
+    RTPREF_IGMP         = 115;
+    // [brief]: OSPF External route
+    RTPREF_OSPF_ASE     = 150;
+    // [brief]: Border Gateway Protocol - external peer
+    RTPREF_BGP_EXT      = 170;
+}
+
+// [brief]: Route attributes message.
+// [detail]:Route attributes message type with attributes like preference, tags and colors.
+message RouteAttributes {
+    // [brief]: Route preference
+    // [detail]: Route preference attributes are used by the route selection
+    // process to select the active route amongst the usable routes for a given
+    // destination.
+    // preferences are optional unsigned 32-bit integer values (range 0 to
+    // 2^32-1). Lower the value, more preferable is the route. Routes are
+    // sorted based on the preference array values.
+    // It should be noted that some preferences have special meaning in JUNOS.
+    // preferences[0] is treated as administrative distance and is same as
+    // preference field in the CLI. JUNOS assigns a default preference
+    // value based on the protocol.
+    // Lowest preference value any programmed route can take is 5. Values
+    // less than 5 in update requests will be changed to 5.
+    // preferences[1] is same as preference2 in the CLI.
+    // For programmed routes, preference2 will default to 100, making them
+    // preferred over static routes added via CLI (without the optional
+    // preference2).
+    // By explicitly setting preference and prefernce2, applications can
+    // make programmed routes more/less desirable than other routes.
+    // It should be noted that BGP owned routes use preference2 for storing
+    // 1's complement of local preference, making routes with higher local
+    // preference value more preferable.
+    // At present, 2 preference values are allowed.
+    // OPTIONAL
+    map<uint32, google.protobuf.UInt32Value> preferences = 1;
+
+    // [brief]: tags
+    // [detail]: tags are optional unsigned 32-bit integer values
+    // (range 0 to 2^32-1) that can be associated with a route entry for use
+    // in policy matching.
+    // If tags is not set, no value will be set by default to tag/tag2.
+    // Tags do not directly influence the route selection process, but can be
+    // used by route policies to influence the route selection process.
+    // It should be noted that some protocols in JUNOS may read/update/advertise
+    // tag field contents.
+    // For e.g: For routes advertised into OSPF, tags[0] corresponds to the
+    // 32-bit tag field in OSPF external LSA packets and tags[1] corresponds
+    // to the area ID.
+    // For IS-IS, tags[0]/tags[1] corresponds to the 32-bit Administrative Tag
+    // Sub-TLV (RFC 5130).
+    // tags[0] and tags[1] correspond to the corresponding tag and tag2 in
+    // JUNOS CLI.
+    // At present, 2 tag values are supported.
+    // OPTIONAL
+    map<uint32, google.protobuf.UInt32Value> tags        = 2;
+
+    // [brief]: colors
+    // detail]: colors are optional unsigned 32-bit integer values
+    // (range 0 to 2^32 -1) that can be associated with a route and can be
+    // used for policy matching. They are similar to route tags.
+    // If colors is not set, no value will be set by default to color/color2.
+    // It should be noted that some protocols in JUNOS may read/update/advertise
+    // tag field contents.
+    // RSVP may advertise colors[0] and colors[1] from IGP routes contents to
+    // RSVP peers in inter-as scenarios.
+    // colors[0] and colors[1] corresponds to the corresponding color and
+    // color2 in JUNOS CLI.
+    // At present, 2 color values are supported.
+    // OPTIONAL
+    map<uint32, google.protobuf.UInt32Value> colors      = 3;
+}
+
+// [brief]: Route entry
+// [detail]: Route entry with route address, mask and attributes
+message RouteEntry {
+    // [mandatory]:
+    // [brief]: Route key attribute.
+    RouteMatch                          key	   = 1;
+
+    // [mandatory]:
+    // [brief]: Nexthop details of the route.
+    RouteNexthop                        nexthop    = 2;
+
+    // [brief]: Protocol
+    // [detail]: Protocol that added this route. Currently, this is only
+    // used in subscribe response. It cannot be used during RIB Add/modify/del
+    // calls as this should  be set to the protocol adding the route and
+    // routes added via these APIs are always Static routes.
+    jnx.jet.routing.base.RouteProtoType protocol   = 3;
+
+    // [brief]: Route attributes
+    // [detail]: Route attributes are optional information associated with
+    // a route entry. They may be used in route selection and also by route
+    // policy engine. Some of these attributes may get advertised by protocols
+    // to their peers.
+    // OPTIONAL
+    RouteAttributes                     attributes = 4;
+}
+
+// [brief]: Route initialize request.
+// [detail]: Client initialization request message contains the response
+// address format and default preference values.
+message RouteInitializeRequest {
+    // [brief]: Response address format to specify the network address format
+    // in response messages. OPTIONAL. Default is STRING.
+    jnx.jet.common.AddressFormat   default_response_address_format = 1;
+
+    // [brief]: Default preference. OPTIONAL.
+    // [detail]: Default preference is applied during route operations that do not specify preference.
+    //
+    // If the preference1 value passed by client is less than 5 or not passed at all, then by default preference1 value
+    // will be set to 5.
+    //
+    // If the preference2 value is not passed by the client, then by default preference2 value
+    // will be set to 100.
+    //
+    // The default preferences set during initialize will always overwrite the existing prefernces in the route table
+    // whenever the update/modify is called without passing preference values.
+    //
+    // Scenario 1: Initialize with pref1 = X and pref2 = Y.
+    //             Add route with pref1 =  A and pref2 = B.
+    //             Modify route without passing pref1 or pref2.
+    // Now the preference for the newly added route will be X and Y.
+    //
+    // Scenario 2: Initialize with pref1 = X and pref2 = NULL.
+    // Now the defaul preference will be X and 100 (Since pref2 is not passed).
+    //             Add route without pref1 and pref2 = Y.
+    // Now the preference for the newly added route will be X and Y.
+    map<uint32, google.protobuf.UInt32Value> default_preferences = 2;
+}
+
+// [brief]: Route initialization response.
+// [detail]: Response message specifying the final status, detailed message
+// and number of previously added routes for the route initialize request.
+message RouteInitializeResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status        = 1;
+
+    // [mandatory]:
+    // [brief]: The API specific return sub-code for the request.
+    StatusCode        sub_code             = 2;
+
+    // [mandatory]:
+    // [brief]: Indicates the number of routes previously added by this client.
+    uint32 num_client_routes               = 3;
+}
+
+// [brief]: Route clean up request.
+// [detail]: Request to clean up the client routes.
+message RouteCleanupRequest {
+}
+
+// [brief]: Route clean up response.
+// [detail]: Response message specifying the final status and the text message
+// to route clean up request.
+message RouteCleanupResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status        = 1;
+
+    // [mandatory]:
+    // [brief]: The API specific return sub-code for the request.
+    StatusCode        sub_code             = 2;
+}
+
+// [brief]: Route update request message.
+// [detail]: Route update request message type with repeated route entries.
+message RouteUpdateRequest {
+    // [mandatory]:
+    // [brief]: One or more programmed routes to update.
+    repeated RouteEntry routes = 1;
+}
+
+// [brief]: Route delete request message.
+// [detail]: Route delete request message type with repeated route match entries to be deleted.
+message RouteDeleteRequest {
+    // [mandatory]:
+    // [brief]: Route parameters for one or more programmed routes to be deleted.
+    repeated RouteMatch keys = 1;
+}
+
+// [brief]: Route match type.
+// [detail]: Various ways to match a route for get requests.
+// [default]: BEST
+enum RouteMatchType {
+    //[brief]: Match the best route.
+    BEST	    = 0;
+    //[brief]: Match the exact route.
+    EXACT	    = 1;
+    //[brief]: Match the exact or longer prefix route.
+    EXACT_OR_LONGER = 2;
+}
+
+// [brief]: Route get request message.
+// [detail]: Route get request message type with the RPC parameters to get the route entries from the route table.
+message RouteGetRequest {
+    // [mandatory]:
+    // [brief]: Route matching parameters.
+    RouteMatch                            key		       = 1;
+
+    // [brief]: route match type.
+    // [detail]: If match_type is EXACT, only routes for the exact destination
+    // prefix and prefix length will be matched.
+    // If match_type is EXACT_OR_LONGER, routes for the given destination
+    // prefix or longer prefixes will be matched.
+    // If match_type is BEST, longest prefix match is performed on the prefix.
+    // OPTIONAL, default is best.
+    RouteMatchType	                  match_type           = 2;
+
+    // [brief]: active_only.
+    // [detail]: If active_only is TRUE, inactive and hidden routes for a
+    // matching prefix will be omitted from the results. If FALSE, inactive
+    // and hidden routes are also returned. Optional (default is FALSE).
+    bool                                  active_only          = 3;
+
+    // [brief]: The format to be used for route table in replies to this request.
+    // [default_value]: string
+    jnx.jet.routing.base.RouteTableFormat reply_table_format   = 4;
+
+    // [brief]: route count
+    // [detail]: The maximum number of routes requested in each response.
+    // Replies will be streamed in multiple RPCs each having no more
+    // routes than given by this value. Counts from 1 through the maximum of
+    // 1000 may be specified. A value of zero or above 1000 indicates that
+    // the server will choose an appropriate. Optional (default 1).
+    uint32                                route_count          = 5;
+}
+
+// [brief]: Route Subscribe operations.
+// [detail]: match with RPD_MSG_FLASH_SUBSCRIBE_REQUEST.
+// [default]: SUBSCRIBE_NONE
+enum RouteSubscribeOp {
+    //[brief]: not subscribed to any route table.
+    SUBSCRIBE_NONE   = 0;
+    //[brief]: add the subscription for given table.
+    SUBSCRIBE_ADD    = 1;
+    //[brief]: delete the subscription for given table.
+    SUBSCRIBE_DELETE = 2;
+}
+
+// [brief]: Route Operation type of routes replied in RouteSubscribeResponse.
+// [detail]: matches RPD_ROUTE_FLASH_OP*.
+// [default]: ROUTE_SUBSCRIBE_OP_NONE
+enum RouteSubscribeRouteOp {
+    //[brief]: No operation
+    ROUTE_SUBSCRIBE_OP_NONE         = 0;
+    //[brief]: Route add operation
+    ROUTE_SUBSCRIBE_OP_ADD          = 1;
+    //[brief]: Route modification
+    ROUTE_SUBSCRIBE_OP_MODIFY       = 2;
+    //[brief]: Route delete operation
+    ROUTE_SUBSCBIBE_OP_DELETE       = 3;
+    //[brief]: no advertisement
+    ROUTE_SUBSCRIBE_OP_NO_ADVERTISE = 4;
+    //[brief]: end of the route table
+    ROUTE_SUBSCRIBE_OP_END_OF_TABLE = 5;
+}
+
+// [brief]: Route set operation response message containing the status of the operation.
+// [detail]: Response always returns the final status (either success or the
+// first error encountered) and the number of routes that were successfully
+// processed prior to any error or full completion of the request.
+message RouteSetOperResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status                = 1;
+
+    // [mandatory]:
+    // [brief]: The API specific return sub-code for the request.
+    StatusCode        sub_code              = 2;
+
+    // [brief]: The number of requested operations completed successfully.
+    // [detail]: The number of requested operations for which the operation
+    // completed successfully. Note that in the case of delete
+    // operations with or_longer=TRUE or cookie=0, this is not the number of
+    // routes matched and deleted.
+    uint32            operations_completed  = 3;
+}
+
+// [brief]: Route delete response containing the status of the operation.
+// [detail]: Response always returns the final status (either success or the
+// first error encountered) and the number of routes that were successfully
+// processed prior to any error or full completion of the request.
+message RouteDeleteResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status                = 1;
+
+    // [mandatory]:
+    // [brief]: The API specific return sub-code for the request.
+    StatusCode        sub_code              = 2;
+
+    // [brief]: The number of requested operations completed successfully.
+    // [detail]: The number of requested operations for which the operation
+    // completed successfully. Note that in the case of delete
+    // operations with or_longer=TRUE or cookie=0, this is not the number of
+    // routes matched and deleted.
+    uint32            operations_completed  = 3;
+}
+
+// [brief]: Route get response message.
+// [detail]: The response contains the status of the operation and the full or
+// partial set of matching routes, depending on how many response RPCs the
+// stream of routes is split among.
+message RouteGetResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus   status   = 1;
+
+    // [brief]: The final return code for the request.
+    StatusCode          sub_code = 2;
+
+    // [brief]:  One or more matching routes.
+    repeated RouteEntry routes   = 3;
+}
+
+// [brief]: Route subscribe policy.
+// [detail]: Policy to be used for filtering routes send in
+// RouteSubscribeResponse. This policy has to be configured using CLI or
+// NETCONF as currently programmable APIs do not support configuration of
+// policy statements. This is an optional parameter. If not set then all routes
+// for the registered table will be sent in RouteSubscribeResponse message.
+message RouteSubscribePolicy {
+    // [brief]: Policy name.
+    string  policy = 1;
+}
+
+// [brief]: Route subscribe flags.
+// [detail]: Flags that can be used to change the behavior of routes received
+// via the RouteSubscribeResponse. This can be like requesting End of Record.
+// Matches RPD_MSG_FLASH_SUBSCRIBE_REQUEST*.
+message RouteSubscribeFlags {
+    // [brief]: Subscribe End of Record.
+    bool request_eor            = 1;
+
+    // [brief]: Requested by clients to NOT send them EOR, by default EOR
+    // will be sent to client.
+    bool no_eor_to_client       = 2;
+
+    // [brief]: clients can use this flag to inform server not send withdrawal
+    // messages when last filter is deleted by this client for given table.
+    bool request_no_withdrawal  = 3;
+
+    // [brief]: Set when subscribe request is form Junos Process ESWD.
+    // [brief]: The following client identification is for backward compatibility
+    // and not to be used by new JAPI clients.
+    // To be set when subscribe request is form Junos Process ESWD.
+    bool request_from_eswd      = 4;
+
+    // [brief]: To be set when subscribe request is form Junos Process MCSNOOPD.
+    bool request_from_mcsnoopd  = 5;
+
+    // [brief]: To be set when subscribe request is form Junos Process VRRPD.
+    bool request_from_vrrpd     = 6;
+
+    // [brief]: If this flag is set, client's re-registration triggers all
+    // routes to be notified once again.
+    bool request_force_re_notif = 7;
+}
+
+// [brief]: Route subscribe request message.
+// [detail]: Request message to subscribe for route monitoring. The
+// subscribe denotes the routing table for which route subscribe is requested.
+// Parameters in the subscribe request like subscribe policy can be set to
+// influence which of the routes of the table are sent in the subscribe
+// response message.
+message RouteSubscribeRequest {
+    // [brief]: Name of the route table for which the route subscribe is
+    // requested.
+    jnx.jet.routing.base.RouteTableName table_name = 1;
+
+    // [brief]: Subscribe operation to be performed.
+    RouteSubscribeOp                    operation  = 2;
+
+    // [brief]: Route subscribe flags.
+    RouteSubscribeFlags                 flag       = 3;
+
+    // [brief]: Policy used to filter notifications.
+    // [default]: By Default all routes of the table subscribed is sent in the
+    // response message. Policy can be used for filtering which routes of the
+    // table are sent. For example, a policy can be defined using CLI to
+    // receive only static routes in the table.
+    RouteSubscribePolicy                policy     = 4;
+
+    // [brief]: Context expected by clients to be sent back in response message.
+    uint32                              context    = 5;
+
+    // [brief]: Number of routes to be packed in subscribe response message.
+    // [detail]: This packing is done only when a new rib walk is started till the end
+    // of table is reached.
+    uint32                              route_count = 6;
+}
+
+// [brief]: Route subscribe entry.
+// [detail]: Route subscribe entry is sent to the client in the subscribe
+// response message.
+message RouteSubscribeEntry {
+    // [brief]: The subscribe operation.
+    RouteSubscribeRouteOp operation = 1;
+
+    // [brief]: route entries that are in the subscribe response.
+    RouteEntry            route     = 2;
+}
+
+// [brief]: Route subscribe response.
+// [detail]: Response message which contains the routes of the table
+// subscribed for monitoring.
+message RouteSubscribeResponse {
+    // [mandatory]:
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus                   status     = 1;
+
+    // [brief]: Return code to indicate operation status.
+    StatusCode                          sub_code   = 2;
+
+    // [brief]: Context send by clients in the subscribe request.
+    uint32                              context    = 3;
+
+    // [brief]: Route table to which the route entries of subscribe routes
+    //  belong.
+    jnx.jet.routing.base.RouteTableName table_name = 4;
+
+    // [brief]: One or more route entries to be sent to client.
+    repeated RouteSubscribeEntry        routes     = 5;
+}
+
