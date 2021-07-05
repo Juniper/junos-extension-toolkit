@@ -1,0 +1,1069 @@
+//
+// Copyright 2020, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+//[brief]: This package gives support for BGP services.
+package jnx.jet.routing.bgp;
+
+// [version]: 0.1.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+// [version]: 0.1.0
+import "jnx_routing_base_types.proto";
+// [version]: 0.0.0
+import "google/protobuf/wrappers.proto";
+
+//[changes]: added new statusCode MUTUALLY_EXCLUSIVE_RT_FLAGS_ARE_SET in RouteOperResponse
+option (jnx.jet.common.japi_version) = "0.3.0";
+
+option (jnx.jet.common.junos_release) = "20.4";
+
+//[brief]: BGP services.
+//[detail]: JET RPC service providing BGP route operations to manage BGP services.
+service Bgp {
+
+    // [brief]: BGP Routing Initialize operation.
+    // [detail]: Initialize RPC must be called upon connection or reconnection
+    // to the server. If the client is connecting for the first time, the
+    // server will initialize per-client state for the connection.
+    //
+    // If the client is reconnecting with the same client name following a
+    // connection fault (having not closed a previous connection with
+    // Cleanup), then gateway and route state will be rebound to
+    // the new connection.
+    //
+    // In this case, the return status will indicate that state was rebound
+    // and the client need not reply the previous routing state to the
+    // server.
+    //
+    // Initialization RPC can be called multiple times and the default parameters
+    // will be updated with the latest values from the initialization request.
+    rpc Initialize (InitializeRequest)
+        returns (InitializeResponse) {}
+
+    // [brief]: BGP Routing Cleanup operation.
+    // [detail]: Cleanup will purge all gateway and route state for the
+    // client.
+    rpc Cleanup (CleanupRequest)
+        returns (CleanupResponse) {}
+
+    // [brief]: BGP Route Add operation.
+    // [detail]: Add a BGP-Static route to the routing table.
+    // RouteAdd may be called multiple times for the same prefix to add
+    // multiple paths with distinct path_cookie for the same destination.
+    // If a matching route already exists in the given table, then an error
+    // will be returned.
+    //
+    // RouteUpdateRequest may contain from one to 1000 routes
+    // to be added.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    //
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully created
+    // prior to any error or full completion of the request.
+    rpc RouteAdd (RouteUpdateRequest)
+        returns (RouteOperResponse) {}
+
+    // [brief]: BGP Route Modify operation.
+    // [detail]: Modify an existing BGP-Static route in the routing table.
+    // For each route in the request, if the key is matched, the matched
+    // route will be updated with the supplied route attributes.
+    // If a matching route does not exist in the given table, then an error
+    // will be returned.
+    //
+    // RouteUpdateRequest may contain from one to 1000 routes
+    // to be added.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    //
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteModify (RouteUpdateRequest)
+        returns (RouteOperResponse) {}
+
+    // [brief]: BGP Route Update operation.
+    // [detail]: Create a new BGP-Static route if a matching route does not exist, OR
+    // modify an existing BGP-Static route if it is already present in the
+    // routing table.
+    //
+    // RouteUpdateRequest may contain from one to 1000 routes
+    // to be added.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    //
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteUpdate (RouteUpdateRequest)
+        returns (RouteOperResponse) {}
+
+    // [brief]: BGP Route Delete operation.
+    // [detail]: Delete a BGP-Static route from the routing table.
+    // RouteDelete may be called multiple times for the same prefix
+    // to delete multiple paths with distinct path_cookie for the same
+    // destination.
+    //
+    // The request may contain from one to 1000 routes
+    // to be deleted.
+    // If the request contains multiple routes, the routes will
+    // be processed in the order given and the first error encountered will
+    // cause the request to abort.
+    //
+    // The API always returns the final status (success or first error
+    // encountered) and the number of routes that were successfully modified
+    // prior to any error or full completion of the request.
+    rpc RouteDelete (RouteDeleteRequest)
+        returns (RouteOperResponse) {}
+
+    // [brief]: BGP Route Get operation.
+    // [detail]: Lookup a BGP or BGP-Static protocol route from the routing
+    // table. All match parameters are optional.
+    // Match fields that are not specified or that
+    // may match more than one route (e.g. a less-specific destination
+    // prefix) may result in multiple routes being returned in the replies.
+    // Only BGP and BGP-Static routes will be matched.
+    //
+    // Replies are streamed until all match routes have been sent. The
+    // client will receive a final null message once all routes have
+    // been received.
+    //
+    // The server's walk of search results is not atomic so route changes
+    // during streaming and consumption of replies may or may not be
+    // reflected in the results.
+    rpc RouteGet (RouteGetRequest)
+        returns (stream RouteGetResponse) {}
+
+    // [brief]: BGP Route Subscribe.
+    // [detail]: Subscribe to receive updates streamed from BGP when routes
+    // matching the bgp-import "analyze" policy action are added, modified,
+    // or withdrawn by BGP peers.
+    //
+    // Updates will be streamed as RouteSubscribeResponse messages
+    // after RouteSubscribe RPC is called.
+    //
+    // Upon initial registration, a full download of route ADD operations for
+    // all routes matching the "analyze" import policy action will be
+    // streamed, followed by a closing END_OF_RIB operation. Subsequently,
+    // incremental updates will be streamed whenever BGP advertisements
+    // from peers are added, modified, or withdrawn, or when BGP import
+    // "analyze" policy is changed.
+    //
+    // There is no strict ordering of routes in the update stream and
+    // state compression is applied when applicable to a set of operations.
+    rpc RouteSubscribe (RouteSubscribeRequest)
+        returns (stream RouteSubscribeResponse) {}
+
+    // [brief]: BGP Route Unsubscribe.
+    // [detail]: Unsubscribe to receive updates streamed from BGP when
+    // routes are added, modified, or withdrawn by BGP peers.
+    rpc RouteUnsubscribe (RouteUnsubscribeRequest)
+        returns (RouteUnsubscribeResponse) {}
+
+    // [brief]: BGP Route Refresh.
+    // [detail]: Request to refresh all route entries to the client.
+    rpc RouteRefresh (RouteRefreshRequest)
+        returns (RouteRefreshResponse) {}
+}
+
+//
+// [brief]: RPF Subtype
+// [detail]: Reverse path forwarding subtype is empty message to indicate the
+// tunnel is intended for upstream, currently used in BGP multicast NLRIs.
+message RpfSubtype {
+}
+
+// [brief]: Egress Endpoint Tunnel Subtype
+// [detail]: Egress Endpoint message contains endpoint address of the router
+// that will decapsulate the payload and in future may contain AS number.
+message EgressEndpoint {
+
+    // [mandatory]:
+    // [brief]: Endpoint router address.
+    jnx.jet.common.IpAddress endpoint_address = 1;
+}
+
+// [brief]: Any Encapsulation Tunnel type
+// [detail]: Any Encapsulation Tunnel types can have one or more Tunnel sub types
+// available. As of now this will be associated to BGP Multicast NLRIs only with
+// Egress endpoint as tunnel subtype to indicate the downstreams and if tunnel is
+// intended for upstream, it will have an RPF Subtype also along with Egress endpoint.
+message AnyEncapTunnel {
+
+    // [mandatory]:
+    // [brief]: Egress Endpoint Tunnel subtype
+    EgressEndpoint egress_endpoint_type = 1;
+
+    // [brief]: RPF subtype
+    // OPTIONAL, will be set only for upstream AnyEncapTunnel
+    RpfSubtype rpf_sub_type = 2;
+}
+
+// [brief]: Tunnel Encapsulation Attribute Tunnel type
+// [detail]: Tunnel Attribute type can be one of multiple tunnel
+// types available.
+message TunnelAttribute {
+
+    // [mandatory]:
+    // [brief]: Can contain one of multiple tunnel types.
+    oneof tunnel_type {
+	// [brief]: Any encapsulation tunnel type
+	// [detail]: Associated to BGP multicast NLRIs, indicates upstream and
+	// downstream information
+	AnyEncapTunnel any_encap_tunnel = 1;
+    }
+}
+
+// [brief]: Tunnel encapsulation attribute
+// [detail]: Message can contain multiple tunnel attributes.
+// Heirarchy of tunnel encapsulation within a BGP NLRI will be as follows :
+// RouteEntry
+//     - Tunnel Encapsulation Attribute
+//	 - Tunnel Attribute
+//	    - Tunnel Type - AnyEncapTunnel Type
+//		 - RPF Tunnel Subtype
+//		 - EgressEndpoint Subtype
+//	 - Tunnel Attribute
+//	    - Tunnel Type - AnyEncapTunnel Type
+//		 - EgressEndpoint Subtype
+//	 - ...
+//	 - Tunnel Attribute n
+//	    - Tunnel Type n
+message TunnelEncapAttribute {
+
+    // [mandatory]:
+    // [brief]: One or more Tunnel attributes to add, update or modify.
+    repeated TunnelAttribute tunnel_list = 1;
+}
+
+// [brief]: BGP peer type.
+// [detail]: BGP peer type identifies if the associated route as an internal (IBGP)
+// or external (EBGP) route.
+// [default]: BGP_INTERNAL
+enum PeerType {
+    // [brief]: IBGP Route
+    BGP_INTERNAL = 0;
+
+    // [brief]: EBGP Route
+    BGP_EXTERNAL = 1;
+}
+
+// [brief]: Route Flags message.
+// [detail]: Route Flags values that alter route add behavior.
+message RouteFlags {
+
+    // [brief]: Route flag indicating whether to attach the well-known
+    // no-advertise community.
+    // [detail]: No-advertise has the effect of instructing the route not to
+    // advertise the route further. The community may alternately be
+    // included in the community_list.
+    // [default_value]: FALSE
+    bool no_advertise        = 1;
+
+    // [brief]: Route flag indicating whether to attach the well-known
+    // no-export community.
+    // [detail]: No-export has the effect of instructing the router not to
+    // advertise the route beyond the BGP confederation boundary.
+    // The community may alternately be included in the community_list.
+    // [default_value]: FALSE
+    bool no_export          = 2;
+
+    // [brief]: Route flag indicating whether to use NH_REJECT for the route.
+    // [detail]: This can be used to save memory when there are a high number of
+    // unique nexthops. This makes sense to be set only when programming route in RR.
+    // use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+    // [default_value]: FALSE
+    bool use_nexthop_reject = 3;
+
+    // [brief]: Route flag indicating whether the next-hop is fictitious.
+    // [detail]: For flow-spec route, the route next-hop will be of type
+    // fictitious.
+    // use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+    // [default_value]: FALSE
+    bool use_nexthop_fictitious = 4;
+}
+
+// [brief]: The route fields that uniquely identify a route.
+// [detail]: Route matching parameters provide the key for identifying
+// BGP routes. Programmed BGP-Static routes must be unique
+// for the bgp_route_match parameters. Dynamic BGP routes may
+// may have multiple matches to a given set of RouteMatch
+// parameters.
+message RouteMatch {
+
+    // [mandatory]:
+    // [brief]: Destination prefix of the route.
+    jnx.jet.routing.base.RoutePrefix    dest_prefix     = 1;
+
+    // [mandatory]:
+    // [brief]: Destination prefix length in bits.
+    uint32                              dest_prefix_len = 2;
+
+    // [mandatory]:
+    // [brief]: Route table specified by either name or ID.
+    jnx.jet.routing.base.RouteTable     table           = 3;
+
+    // [brief]: Protocol that installed the route in the table.
+    // [detail]: This can accept only PROTO_ANY or PROTO_BGP or PROTO_BGP_STATIC.
+    // Permitted values and default behavior are dependent on the RPC.
+    // For route change requests, protocol must be either PROTO_ANY or
+    // PROTO_BGP_STATIC and the resulting route will have PROTO_BGP_STATIC.
+    // For route get requests, matching may be done on either PROTO_ANY, PROTO_BGP
+    // or PROTO_BGP_STATIC.
+    // OPTIONAL
+    jnx.jet.routing.base.RouteProtoType protocol        = 4;
+
+    // [brief]: Path cookie.
+    // [detail]: Path cookie value differentiates routes with the same destination.
+    // The cookie may be any unsigned 64-bit value. The default is 0,
+    // which indicates that cookie is not evaluated for matching.
+    // [default_value]: 0
+    // OPTIONAL
+    uint64                              cookie          = 5;
+
+    // [brief]: List of communities.
+    // [detail]: Community string list associated with route. The list could be
+    // a single/multiple community string or a regular expression.
+    // This is an optional parameter. If this list is null, then all
+    // route with or without community would be matched.
+    // OPTIONAL
+    jnx.jet.routing.base.Communities    communities     = 6;
+}
+
+// [brief]: Route entry.
+// [detail]: A route entry specifying a single route destination and BGP path
+// along with the route attributes for that path.
+message RouteEntry {
+
+    // [mandatory]:
+    // [brief]: Route key attribute.
+    RouteMatch                                    key               = 1;
+
+    // [brief]: Route preference.
+    // [detail]: Route Preference, is also known as administrative distance.
+    // Lower values of route preference are preferred.
+    // [range]: 0:4,294,967,295 (2^32 -1).
+    // [default_value]: 5
+    // OPTIONAL
+    google.protobuf.UInt32Value                   route_preference  = 2;
+
+    // [brief]: Local preference.
+    // [detail]: Higher values of local preference are preferred.
+    // [range]: 0:4,294,967,295 (2^32 -1).
+    // [default_value]: 100
+    // OPTIONAL
+    google.protobuf.UInt32Value                   local_preference  = 3;
+
+    // [brief]: Multi-Exit Discriminator.
+    // [detail]: Lower values of MED are preferred.
+    // [range]: 0:4,294,967,295 (2^32 -1).
+    // [default_value]: No MED is advertised
+    // OPTIONAL
+    google.protobuf.UInt32Value                   med               = 4;
+
+    // [brief]: AIGP distance.
+    // [detail]: Lower values of AIGP distance are preferred.
+    // [range]: 0:2^64-1.
+    // [default_value]: No AIGP distance is advertised.
+    // OPTIONAL
+    google.protobuf.UInt64Value                   aigp_distance     = 5;
+
+    // [brief]: Label information.
+    // [detail]: Label information may be provided either as a single label
+    // in L3VPN tables, or as a full label stack in BGP-Labeled-Unicast tables.
+    // BGP-LU tables for L3VPN should provide a label stack with the VPN label
+    // as the bottom-most label in the stack.
+    // [default_value]: No label information is advertised.
+    // OPTIONAL
+    oneof label_info {
+
+        // [brief]: Label.
+        // [detail]: A valid 20-bit unsigned label value must be less than
+        // decimal value and not within the reserved label range of
+        // 4 through 15 (inclusive). It is not possible to set ToS bits
+        // in this case.
+        // [range]: 16:1,048,576.
+        uint32                                    label             = 6;
+
+        // [brief]: Label stack.
+        // [detail]: A properly constructed label stack which may include
+        // VPN label in addition to a BGP-LU label stack.
+        // NOTE: Label stack is not supported in this release of the API.
+        jnx.jet.routing.base.LabelStack           labels            = 7;
+    }
+
+    // [brief]: AS Path.
+    // [detail]: AS Path for the route.
+    // [default_value]: No non-local AS is advertised in AS Path.
+    // OPTIONAL
+    jnx.jet.routing.base.AsPath                   aspath            = 8;
+
+    // [brief]: BGP originator ID.
+    // [detail]: BGP originator ID is a unsigned 32-bit BGP Identifier
+    // value, as per RFC 6286, encoded in network byte order.
+    // [default_value]: No originator ID is advertised.
+    // OPTIONAL
+    google.protobuf.UInt32Value                   originator_id     = 9;
+
+    // [brief]: BGP cluster list.
+    // [detail]: BGP cluster list, list of cluster IDs specifying the
+    // path of route reflectors though which this route has traversed.
+    // [default_value]: No cluster list is advertised.
+    // OPTIONAL
+    repeated google.protobuf.UInt32Value          cluster_list      = 10;
+
+    // [brief]: BGP cluster ID.
+    // [detail]: BGP Cluster ID is an unsigned 32-bit BGP Identifier value,
+    // as per RFC 6286, encoded in network byte order. Cluster ID is
+    // append to the cluster_list for advertisement with reflected routes.
+    // [default_value]: No cluster ID is advertised.
+    // OPTIONAL
+    google.protobuf.UInt32Value                   cluster_id        = 11;
+
+    // [mandatory]:
+    // [brief]: Protocol next-hops.
+    // [detail]: Protocol next-hop(s) for the route. If multiple next-hops are
+    // given, the route will be treated as a BGP multipath for load balancing.
+    // NOTE: Multipath is not currently supported by the API and
+    // an error will be returned when adding/changing a route with more than
+    // one next-hop.
+    // [max_entries]: 1
+    repeated jnx.jet.common.IpAddress             protocol_nexthops = 12;
+
+    // [brief]: BGP Peer type for this route.
+    // [default_value]: BGP_INTERNAL.
+    // OPTIONAL
+    PeerType                                      route_type        = 13;
+
+    // [brief]: Flags for routes. These flags are generally non-mutually
+    // exclusive states.
+    // [default_value]: No flags.
+    // OPTIONAL
+    RouteFlags                                     route_flags      = 14;
+
+    // [brief]: Address family specific route data.
+    // [detail]: Mandatory for address family for which it is defined.
+    // (e.g. SRTE).
+    jnx.jet.routing.base.AddressFamilySpecificData addr_family_data = 15;
+
+    // [brief]: Tunnel encapsulation attribute
+    // [detail]: BGP Path Attribute known as the Tunnel Encapsulation attribute.
+    // Contain information that is used to form the encapsulation header
+    // for one of the specified tunnel type.
+    // OPTIONAL by default, no tunnel_attributes are advertised
+    TunnelEncapAttribute tunnel_attributes = 16;
+}
+
+// [brief]: Route Subscribe entry.
+// [detail]: A subscribing entry for a single BGP route streamed from BGP
+// when the client has subscribed for route subscribing with RouteSubscribe().
+message RouteSubscribeEntry {
+
+    // [brief]: Route Subscribe operations.
+    // [detail]: The route operation types for the subscribe entries.
+    // [default]: ROUTE_UPDATE
+    enum RouteSubscribeOper {
+
+        // [brief]: A new route is being added or modified.
+        // bgp_route will contain the route info.
+        ROUTE_UPDATE  = 0;
+
+        // [brief]: An existing route is being deleted.
+        // bgp_route will contain the route info.
+        ROUTE_DELETE  = 1;
+
+        // [brief]: The initial set of route subscribing entries following a fresh
+        // client registration has been completed. bgp_route will be null for
+        // this operation.
+        END_OF_RIBS   = 2;
+    }
+
+    // [brief]: The route subscribe operation type.
+    RouteSubscribeOper operation = 1;
+
+    // [brief]: Route entry for subscribing route.
+    // [detail]: The route that is the subject of this route subscribing operation.
+    // If the operation is END_OF_RIBS, then no route will be
+    // present here.
+    RouteEntry         route     = 2;
+}
+
+// [brief]: Initialize request.
+// [detail]: Request to initialize the BGP route service. No parameters are needed.
+message InitializeRequest {
+
+    // [brief]: The format for IP addresses to be used in response message of get and
+    // subscribe.
+    // [default_value]: string
+    // OPTIONAL
+    jnx.jet.common.AddressFormat           default_address_format = 1;
+
+    // [brief]: The format for table name to be used in response message of get and
+    // subscribe.
+    // [default_value]: string
+    // OPTIONAL
+    jnx.jet.routing.base.RouteTableFormat  default_table_format   = 2;
+}
+
+// [brief]: Initilize response.
+// [detail]: BGP route service initialize reply containing the status of the
+// operation. Replies indicate to the client whether any old routing state
+// was recovered and rebound to this connection.
+message InitializeResponse {
+
+    // [brief]: Initialize status code.
+    // [detail]: Possible return codes for route service initialize operations.
+    // [default]: SUCCESS
+    enum StatusCode {
+
+        // [brief]: Request successfully completed. Note that no preexisting
+        // state for old clients with the same name was rebound.
+        SUCCESS                = 0;
+
+        // [brief]: Request successfully completed AND preexisting routing state
+        // for an old client connection of the same name has been recovered
+        // and bound to this client connection.
+        SUCCESS_STATE_REBOUND  = 1;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR         = 2;
+
+        // [brief]: Failed due to previous initialization operation.
+        ALREADY_INITIALIZED    = 3;
+
+        // [brief]: Failed to find or create a gateway.
+        GATEWAY_INVALID        = 4;
+
+        // [brief]: Previous clean up work is pending try again later.
+        CLEANUP_PENDING        = 5;
+
+        // [brief]: The BGP protocol is not configured and initialized.
+        BGP_NOT_READY          = 6;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status            = 1;
+
+    // [brief]: Return code to indicate operation status.
+    StatusCode        sub_code                 = 2;
+
+    // [brief]: Number of routes on gateway.
+    // [detail]: Valid only when status is CLEANUP_PENDING and will indicate
+    // the number of routes on the gateway, giving an idea of the time
+    // required to cleanup.
+    uint32            num_client_routes	       = 3;
+}
+
+// [brief]: Request to reset the BGP route service.
+// [detail]: Any routes that were added by the client will be removed during
+// the cleanup of the client's state. No parameters are needed.
+message CleanupRequest {
+}
+
+// [brief]: Cleanup response.
+// [detail]: Route service cleanup reply containing the status of the operation.
+message CleanupResponse {
+
+    // [brief]: Cleanup status code.
+    // [detail]: Possible return codes for route service cleanup operations.
+    // [default]: SUCCESS.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed.
+        SUCCESS         = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR  = 1;
+
+        // [brief]: Request failed because there was no initialized state
+        // to cleanup.
+        NOT_INITIALIZED = 2;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The final return code for the request.
+    StatusCode               sub_code = 2;
+}
+
+// [brief]: Route update request.
+// [detail]: Route add/modify/update operation request parameters.
+message RouteUpdateRequest {
+
+    // [mandatory]:
+    // [brief]: One or more programmed BGP routes to add.
+    // [max_entries]: 1000
+    repeated RouteEntry routes = 1;
+}
+
+// [brief]: Route delete operation request.
+// [detail]: Route delete operation request parameters.
+message RouteDeleteRequest {
+
+    // [brief]: Flag to match longer prefix.
+    // [detail]: If or_longer is FALSE only routes for the exact
+    // destination prefix and prefix length will be matched.
+    // If or_longer is TRUE, routes for the given destination prefix
+    // or longer prefixes will be matched.
+    // [default_value]: FALSE
+    // OPTIONAL
+    bool                or_longer = 1;
+
+    // [mandatory]:
+    // [brief]: One or more programmed BGP routes to delete.
+    // [max_entries]: 1000
+    repeated RouteMatch routes    = 2;
+}
+
+// [brief]: Route get operation request.
+// [detail]: Route get operation request parameters.
+message RouteGetRequest {
+
+    // [brief]: Route matching parameters.
+    RouteMatch                            route                = 1;
+
+    // [brief]: Flag to match longer prefix.
+    // [detail]: If or_longer is FALSE only routes for the exact destination
+    // prefix and prefix length will be matched.
+    // If or_longer is TRUE, routes for the given destination prefix
+    // or longer prefixes will be matched.
+    // [default_value]: FALSE
+    // OPTIONAL
+    bool                                  or_longer            = 2;
+
+    // [brief]: Flag to select active only routes.
+    // [detail]: If active_only is TRUE, inactive and hidden routes for a
+    // matching prefix will be omitted from the results. If FALSE, inactive
+    // and hidden routes are also returned.
+    // [default_value]: FALSE
+    // OPTIONAL
+    bool                                  active_only          = 3;
+
+    // [brief]: Maximum routes in reply.
+    // [detail]: The maximum number of routes requested in each reply.
+    // Replies will be streamed in multiple RPCs each having no more
+    // routes than given by this value. Counts from 1 through the maximum of
+    // 1000 may be specified. A value of zero indicates that
+    // the server will choose an appropriate.
+    // [range]: 1:1,000.
+    // [default_value]: 1
+    // OPTIONAL
+    uint32                                route_count          = 4;
+}
+
+// [brief]: Route operation response.
+// [detail]: Route operation response contains the status of the operation.
+// Response always returns the final status (either success or the first error
+// encountered) and the number of routes that were successfully processed
+// prior to any error or full completion of the request.
+message RouteOperResponse {
+
+    // [brief]: Response sub-code.
+    // [detail]: Possible return sub-code for route add/modify/update/remove operations.
+    // [default]: SUCCESS.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed in full.
+        SUCCESS                 = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR          = 1;
+
+        // [brief]: The BGP route service has not been initialized.
+        NOT_INITIALIZED         = 2;
+
+        // [brief]: Request did not result in any operations.
+        NO_OP                   = 3;
+
+        // [brief]: Request contained too many operations.
+        TOO_MANY_OPS            = 4;
+
+        // [brief]: Request contained an invalid table.
+        TABLE_INVALID           = 5;
+
+        // [brief]: Request contained a table that was not ready for operations.
+        TABLE_NOT_READY         = 6;
+
+        // [brief]: Request contained an invalid destination address prefix.
+        PREFIX_INVALID          = 7;
+
+        // [brief]: Request contained a destination prefix length too short for
+        // the supplied address/NLRI.
+        PREFIX_LEN_TOO_SHORT    = 8;
+
+        // [brief]: Request contained a destination prefix length too long for
+        // the supplied address/NLRI.
+        PREFIX_LEN_TOO_LONG     = 9;
+
+        // [brief]: The server did not have a valid gateway associated with the
+        // client.
+        GATEWAY_INVALID         = 10;
+
+        // [brief]: Request contained an invalid nexthop.
+        NEXTHOP_INVALID         = 11;
+
+        // [brief]: Request contained a nexthop with an invalid address.
+        NEXTHOP_ADDRESS_INVALID = 12;
+
+        // [brief]: Request to add paths exceeding maximum ECMP paths for a
+        // destination.
+        NEXTHOP_ECMP_LIMIT      = 13;
+
+        // [brief]: Request contained an invalid community.
+        COMMUNITY_LIST_INVALID  = 14;
+
+        // [brief]: Request contained an invalid AS path.
+        ASPATH_INVALID          = 15;
+
+        // [brief]: Request contained a invalid label information.
+        LABEL_INFO_INVALID      = 16;
+
+        // [brief]: Request contains a route that is already present in the table.
+        ROUTE_EXISTS            = 17;
+
+        // [brief]: Request contains a route that is NOT present in the table.
+        ROUTE_NOT_FOUND         = 18;
+
+        // [brief]: Request contains an invalid cluster list.
+        CLUSTER_LIST_INVALID    = 19;
+
+        // [brief]: Request contains an invalid protocol. Only PROTO_UNSPECIFID
+        // or PROTO_BGP_STATIC are allowed in route change operations.
+        PROTOCOL_INVALID        = 20;
+
+        // [brief]: Request contains a route that is NOT present in the table.
+        ROUTE_ADD_FAILED        = 21;
+
+        // [brief]: The BGP protocol is not initialized and ready to accept
+        // route change operations.
+        BGP_NOT_READY           = 22;
+
+        // [brief]: Request cannot be serviced until current requests are processed.
+        REQUEST_NOT_DONE        = 23;
+
+        // [brief]: Request contains a parameter that is not currently supported.
+        REQUEST_UNSUPPORTED     = 24;
+
+        // [brief]: Request contained an invalid BGP peer type.
+        PEER_TYPE_INVALID       = 25;
+
+        // [brief]: SR-TE Segment Lists is invalid, like zero segment list.
+        SEGMENT_LIST_INVALID    = 26;
+
+        // [brief]: SR-TE Segment is invalid, like zero segment list.
+        SEGMENT_INVALID         = 27;
+
+        // [brief]: SR-TE Segment label is invalid; reserved label or
+        // label TTL > 255.
+        SEGMENT_LABEL_INVALID   = 28;
+
+        // [brief]: SR-TE Segment ID is invalid like segment type is not set.
+        SEGMENT_ID_INVALID      = 29;
+
+        // [brief]: Number of SR-TE Segment Lists exceeded limit (8).
+        SEGMENT_LIST_COUNT_INVALID  = 30;
+
+        // [brief]: Number of SR-TE Segments exceeded limit (5).
+        SEGMENT_COUNT_INVALID       = 31;
+
+        // [brief]: SRTE Route Data is not set.
+        SRTE_ROUTE_DATA_INVALID     = 32;
+
+        // [brief]: Flow spec address field is invalid.
+        FLOWSPEC_ADDR_INVALID       = 33;
+
+        // [brief]: Flow spec match fields invalid or no match field is specified.
+        FLOWSPEC_MTCH_FLDS_INVALID  = 34;
+
+        // [brief]: Flow spec prefix contains invalid action or no action specified.
+        FLOWSPEC_ACTION_INVALID     = 35;
+
+        // [brief]: Flow spec prefix matches an existing flow-spec route added by CLI.
+        FLOWSPEC_STATIC_RT_EXISTS   = 36;
+
+        // [brief]: SRTE Priority value is invalid. Valid values are [1,255]
+        SRTE_PRIORITY_INVALID       = 37;
+
+        // [brief]: Request contained an invalid tunnel list
+        TUNNEL_ATTR_LIST_INVALID = 38;
+
+        // [brief]: Egress endpoint not a valid unicast or ipv4 address
+        TUNNEL_ATTR_EGRESS_ENDPOINT_NOT_IPV4 = 39;
+
+        // [brief]: Color community mismatch
+        TUNNEL_ATTR_COLOR_COM_COLOR_MISMATCH = 40;
+
+        // [brief]: Endpoint nexthop mismatch
+        TUNNEL_ATTR_ENDPOINT_NH_MISMATCH = 41;
+
+        // [brief]: AnyEncap Tunnel type inside tunnel list is invalid
+        TUNNEL_ATTR_ANYENCAP_INVALID = 42;
+
+        // [brief]: RPF subtype within tunnel is invalid
+        TUNNEL_ATTR_RPF_INVALID = 43;
+
+        // [brief]: Tunnel egress endpoint subtype is invalid
+        TUNNEL_ATTR_EGRESS_ENDPOINT_INVALID = 44;
+
+        // [brief]:  SRTE ENLP value is invalid. Valid values are 1-4.
+        SRTE_ENLP_INVALID        = 45;
+
+        // [brief]: Request has mutually exclusive route-flags set.
+        // use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+        MUTUALLY_EXCLUSIVE_RT_FLAGS_ARE_SET = 46;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status               = 1;
+
+    // [brief]: The final return code for the request.
+    StatusCode               sub_code             = 2;
+
+    // [brief]: Number of successful operations.
+    // [detail]: The number of requested operations for which the operation
+    // completed successfully. Note that in the case of remove
+    // operations with or_longer=TRUE or cookie=0, this is not the number of
+    // routes matched and removed.
+    uint32                   operations_completed = 3;
+}
+
+// [brief]: Route get response.
+// [detail]: Route get reply containing the status of the operation and the
+// full or partial set of matching routes, depending on how many reply RPCs
+// the stream of routes is split among.
+message RouteGetResponse {
+
+    // [brief]: Get status code.
+    // [detail]: Possible return codes for route service get operations.
+    // [default]: SUCCESS
+    enum StatusCode {
+
+        // [brief]: Request successfully completed in full.
+        SUCCESS              = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR       = 1;
+
+        // [brief]: Request failed because there was no initialized state to
+        // cleanup.
+        NOT_INITIALIZED      = 2;
+
+        // [brief]: Request contained an invalid table.
+        TABLE_INVALID        = 3;
+
+        // [brief]: Request contained a table that was not ready for operations.
+        TABLE_NOT_READY      = 4;
+
+        // [brief]: Request contained an invalid destination address prefix.
+        PREFIX_INVALID       = 5;
+
+        // [brief]: Request contained a destination prefix length too short for the
+        // supplied address/NLRI.
+        PREFIX_LEN_TOO_SHORT = 6;
+
+        // [brief]: Request contained a destination prefix length too long for the
+        // supplied address/NLRI.
+        PREFIX_LEN_TOO_LONG  = 7;
+
+        // [brief]: Request contained a route that does not match
+        // destinations in the routing table.
+        ROUTE_NOT_FOUND      = 8;
+
+        // [brief]: Request specified an invalid protocol to match.
+        PROTOCOL_INVALID     = 9;
+
+        // [brief]: Request does not contain valid route match parameters.
+        ROUTE_INVALID        = 10;
+
+        // [brief]: Request contains a parameter that is not currently supported.
+        REQUEST_UNSUPPORTED  = 11;
+
+        // [brief]: Request cannot be serviced until current requests are processed.
+        TRY_AGAIN            = 12;
+
+        // [brief]: Request contains a route_count that exceeds the max of 1000.
+        ROUTE_COUNT_INVALID  = 13;
+
+        // [brief]: Request contained an invalid community.
+        COMMUNITY_LIST_INVALID     = 14;
+
+        // [brief]: Flow spec address field is invalid.
+        FLOWSPEC_ADDR_INVALID      = 15;
+
+        // [brief]: Flow spec match fields invalid or no match field is specified.
+        FLOWSPEC_MTCH_FLDS_INVALID = 16;
+
+        // [brief]: Flow spec prefix contains invalid action or no action specified.
+        FLOWSPEC_ACTION_INVALID    = 17;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus   status   = 1;
+
+    // [brief]: The final return code for the request.
+    StatusCode                 sub_code = 2;
+
+    // [brief]: One or more matching BGP routes.
+    // [detail]: The maximum number of routes received will be always equal to
+    // route_count mentioned when RouteGetRequest RPC was called.
+    repeated RouteEntry        routes   = 3;
+}
+
+// [brief]: Route subscribe request.
+// [detail]: Route subscribe operation request parameters. Subscribes the
+// client for streaming route subscribing.
+message RouteSubscribeRequest {
+
+    // [brief]: Number of routes in response.
+    // [detail]: The maximum number of routes requested in each subscribing message.
+    // Replies will be streamed in multiple RPCs each having no more
+    // routes than given by this value. Counts from 1 through the maximum of
+    // 1000 may be specified. A value of zero indicates that
+    // the server will choose an appropriate.
+    // [range]: 1:1,000.
+    // [default_value]: 1
+    // OPTIONAL
+    uint32 route_count  = 1;
+}
+
+// [brief]: Route subscribe response.
+// [detail]: The route subscription response is returned immediately upon initial
+// subscription for route subscribing via a call to BgpRouteSubscribe.
+// Subsequently, subscribing entries are streamed via response containing
+// route information and status.
+message RouteSubscribeResponse {
+
+    // [brief]: Subscribe status code.
+    // [detail]: Possible return codes for route subscribe operations.
+    // [default]: SUCCESS
+    enum StatusCode {
+        // [brief]: Request successfully completed in full.
+        SUCCESS                = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR         = 1;
+
+        // [brief]: The BGP route service has not been initialized.
+        NOT_INITIALIZED        = 2;
+
+        // [brief]: Too many clients or BMP stations are already subscribed.
+        REGISTRATIONS_EXCEEDED = 3;
+
+        // [brief]: Client is already subscribed.
+        ALREADY_SUBSCRIBED     = 4;
+
+        // [brief]: Request contains a route_count that exceeds the max of 1000.
+        ROUTE_COUNT_INVALID    = 5;
+
+        // [brief]: Request contains invalid address format.
+        ADDRESS_FORMAT_INVALID = 6;
+
+        // [brief]: Request contains invalid table format.
+        TABLE_FORMAT_INVALID   = 7;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus     status            = 1;
+
+    // [brief]: The return code for the registration operation.
+    StatusCode                   sub_code          = 2;
+
+    // [brief]: A set of subscribe entries for individual routes or
+    // the end-of-ribs indication.
+    // [detail]: The maximum number of entries received will be always equal
+    // to route_count mentioned when RouteSubscribeRequest RPC was called.
+    repeated RouteSubscribeEntry subscribe_entries = 3;
+}
+
+// [brief]: Route unsubscribe request.
+// [detail]: Request to unsubscribe the client from the BGP route
+// subscribe. No parameters are needed.
+message RouteUnsubscribeRequest {
+}
+
+// [brief]: Route unsubscribe response.
+// [detail]: The route unsubscribe reply confirms that the client
+// has unsubscribeed for route updates.
+message RouteUnsubscribeResponse {
+
+    // [brief]: Unsubscribe status code.
+    // [detail]: Possible return codes for route unsubscribe operation.
+    // [default]: SUCCESS
+    enum StatusCode {
+        // [brief]: Request successfully completed in full.
+        SUCCESS         = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR  = 1;
+
+        // [brief]: The BGP route service has not been initialized.
+        NOT_INITIALIZED = 2;
+
+        // [brief]: Client is already subscribed.
+        NOT_SUBSCRIBED  = 3;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The return code for the unregister operation.
+    StatusCode               sub_code = 2;
+}
+
+// [brief]: Route refresh request.
+// [detail]: Request to refresh all route subscribing entries to the client.
+// No parameters are needed.
+message RouteRefreshRequest {
+}
+
+// [brief]: Route refresh response.
+// [detail]: The route Refresh response confirms that the client has
+// triggered a refresh of route subscribing entries, which
+// will be delivered followed by End-of-RIBs via the
+// BgpRouteSubscribeResponse stream.
+message RouteRefreshResponse {
+
+    // [brief]: Refersh status code.
+    // [detail]: Possible return codes for route refersh operation.
+    // [default]: SUCCESS
+    enum StatusCode {
+        // [brief]: Request successfully completed in full.
+        SUCCESS         = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR  = 1;
+
+        // [brief]: The BGP route service has not been initialized.
+        NOT_INITIALIZED = 2;
+
+        // [brief]: Client is already subscribed.
+        NOT_SUBSCRIBED  = 3;
+    }
+
+    // [brief]: Top level return code.
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The return code for the refresh operation.
+    StatusCode               sub_code = 2;
+}
+
