@@ -1,0 +1,92 @@
+//
+// Copyright 2018, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file provides an RPC for API Registration
+
+syntax = "proto3";
+
+package jnx.jet.registration;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "18.4";
+
+// [brief]: API registration service definition
+// [detail]: API registration service definition
+service Registration {
+  // [brief]: Register an API with the Junos service daemon.
+  // [detail]: Register an API with the Junos service daemon.
+  rpc ApiRegister (ApiRegisterRequest) returns (ApiRegisterResponse) {}
+}
+
+// [brief]: The request message containing the service registration info
+// [detail]: The request message containing the service registration info
+message ApiRegisterRequest {
+  // [brief]: Input type for API information registration
+  oneof input_type {
+    // [brief]: API information to register represented as JSON string
+    string json_string = 1;
+
+    // [brief]: Absolute path to json file containing API info to register
+    string json_file  = 2;
+  }
+
+  // [brief]: Target ip-address/unix domain socket
+  // [detail]: Target ip-address/unix domain socket for this service
+  // For e.g., IPv6 address format will be "[::]:50051",
+  // IPv4 address format will be "0.0.0.0:50051" format and
+  // unix domain socket format will be "unix:/tmp/test_socket"
+  string target = 3;
+
+  // [brief]: Registration ID to store APIs
+  // [detail]: Registration ID which will be used as the filename
+  // to store the APIs registered in /opt/lib/japi/<register-id>.json
+  // JSD will read the contents of this file upon restart. When the
+  // daemon re-registers the APIs, it needs to use the same register ID.
+  // This will allow JSD to delete the old file and store the new
+  // contents in that file.
+  string id = 4;
+
+   // [brief]: Boolean to let JSD skip login
+   // [detail]: Boolean variable to indicate if JSD should skip Login()
+   // call for RPCs executed for this package from clients if they
+   // are connected using a secure channel
+  bool skip_authentication = 5;
+
+  // [brief]: Logical-system name for the target
+  // [detail]: Logical-system name for the target if applicable
+  // Eg: "rt1"
+  string logical_system = 6;
+
+  // [brief]: Routing-instance name for the target
+  // [detail]: Routing-instance name for the target if applicable
+  // Eg: "__juniper_private1__"
+  string routing_instance = 7;
+}
+
+// [brief]: Registration response message
+// [detail]: Registration response message
+message ApiRegisterResponse {
+  reserved 2;
+  reserved "sub_code";
+
+  // [brief]: Registration Request status
+  jnx.jet.common.RpcStatus status = 1;
+}
