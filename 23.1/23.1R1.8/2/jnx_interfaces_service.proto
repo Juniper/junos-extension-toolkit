@@ -1,0 +1,1546 @@
+//
+// Copyright 2018-2021, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+// [brief]:   Public API definitions for the Interfaces services
+// [detail]:  This file defines services for interface specific configurations
+// This file defines the following APIs
+//    - ADD API for interface related objects ( interface, interface unit,
+//            interface family, interface address, arp/ndp configuration)
+//    - UPDATE API for interface related objects ( interface, interface unit,
+//            interface family, interface address, arp/ndp configuration)
+//    - DELETE API for interface related objects ( interface, interface unit,
+//            interface family, interface address, arp/ndp configuration)
+//    - GET API for interface related objects ( interface, interface unit,
+//            interface family, interface address, arp/ndp configuration)
+//    - Permissions GET API for interface related objects ( interface,
+//            interface unit, interface family, interface address, arp/ndp
+//            configuration)
+
+syntax = "proto3";
+
+package jnx.jet.interfaces;
+
+// [version]: 0.2.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Added a new generic error code.
+option (jnx.jet.common.japi_version) = "0.2.0";
+
+option (jnx.jet.common.junos_release) = "19.1";
+
+
+
+// [brief]:  Message definition for String attribute
+// [detail]: This message defines the format for passing a string attribute for the
+// different interface objects.
+message StringAttribute {
+
+    // [brief]:   Key for the string attribute
+    // [detail]:  This field specifies the key value for the string attribute.
+    string            key                                                       = 1;
+
+
+    // [brief]:   Value for the attribute
+    // [detail]:  This field specifies the string value for the string attribute.
+    string            value                                                     = 2;
+}
+
+
+
+// [brief]:  Message definition for Integer attribute
+// [detail]: This message defines the format for passing an integer attribute for the
+// different interface objects.
+message IntegerAttribute {
+
+    // [brief]:   Key for the integer attribute
+    // [detail]:  This field specifies the key value for the integer attribute.
+    string            key                                                       = 1;
+
+
+    // [brief]:   Value for the integer attribute
+    // [detail]:  This field specifies the integer value for the integer attribute.
+    uint32            value                                                     = 2;
+}
+
+
+// [brief]:  Message definitions for Aggregate RPC
+// [detail]: Message definition for aggregate interface specific options. This message
+// is valid only for aggregate interfaces and not valid for normal interfaces
+message AggregateOptions {
+
+    // [brief]:  List of member interfaces for this aggregate interface config
+    // [detail]: This config message is valid only for AE interfaces.
+    // Eg: When an AE interface is configured, the list of interfaces are members of
+    // this AE interface could be specified as part of this message.
+    // The list of member interfaces would be specified as repeated strings
+    //
+    // Eg: ge-0/0/1, ge-1/0/1, xe-2/0/1, fe-2/0/2
+    //
+    // As part of processing this config message, the list of interfaces would be
+    // retrieved and these would be added as member interfaces of the specific AE
+    // interface.
+    repeated string aggregate_members                                           = 1;
+}
+
+
+
+// [brief]: Message definition for the interface specific Options in the interface config message.
+// [detail]: The different fields that are configured in this message would be dependent
+// on the interfaces.
+message InterfaceSpecificOptions {
+
+    // [brief]:  List of  optional interface specific options
+    // [detail]: This field allows the user to specify any interface specific options while
+    // providing the configuration information for the interface. The options would be
+    // specific to the particular interface and will not be common for the interfaces.
+    oneof  interface_options {
+
+        // [brief]:  Aggregate Interface specific options
+        // [detail]: This is valid only for aggregate interfaces
+        AggregateOptions    aggregate_options                                   = 1;
+    }
+}
+
+
+
+// [brief]:  Message definition for the attribute lists for the different interface objects.
+// [detail]: The interface attributes could be string attributes or integer attributes.
+// The attributes configuration is optional for interface objects.
+message InterfaceAttributeList {
+
+    // [brief]: List of string attribites for the interface object
+    repeated StringAttribute string_attributes                                     = 1;
+
+    // [brief]: List of integer attribites for the interface object
+    repeated IntegerAttribute integer_attributes                                   = 2;
+}
+
+
+// [brief]:  Message definition for the interface unit information.
+// [detail]: This defintion would be used to define the interface unit number for the interface
+// objects. This is needed since the interface unit number could be 0 and when value 0 is
+// set for the unit number, the information is not marked as configured by user.
+message InterfaceUnit {
+    // [brief]: Interface unit number
+    // [mandatory]:
+    uint32 number                                                               = 1;
+}
+
+
+
+// [brief]:  Message definition for the interface object.
+// [detail]: This defintion would be used to send the interface configuration information
+// using the API.
+message InterfaceConfig {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface specific options based on the interface type
+    InterfaceSpecificOptions interface_options                                  = 2;
+
+    // [brief]: List of optional attributes that can be configured
+    // [detail]: For top level interface object the attributes that can be configured are as below
+    // String Attributes:
+    //     mac - MAC address to be set on the interface.
+    //
+    // Integer Attributes
+    //     mtu - MTU value to be set on the interface.
+    InterfaceAttributeList attributes                                           = 3;
+}
+
+// [brief]: Network Address.
+// [detail]: Network address defined for each supported address family.
+message NetworkAddress {
+    // [brief]: only one field from the below can be set at the same time.
+    oneof af {
+        // [brief]: IPv4 destination address.
+        jnx.jet.common.IpNetwork     inet                                              = 1;
+        // [brief]: IPv6 destination address.
+        jnx.jet.common.IpNetwork     inet6                                             = 2;
+    }
+}
+
+// [brief]: Message definition for Source options for vxlan_gpe encapsulation.
+// [detail]: Either both or atleast one of the attribute must be provided.
+message SourceOptionsVxlangpe {
+    // [brief]: Source mac-address [not supported]
+    // [detail]: This field is not supported as of now. It is for future use
+    // only. Any value provided in this field will be ignored.
+    jnx.jet.common.MacAddress   mac_address                             = 1;
+
+    // [brief]: Source address or Source interface options.
+    oneof source_options {
+        // [brief]: Only IPV4 address is supported without prefix length.
+        NetworkAddress    address                        = 2;
+
+        // [brief]: Source interface
+        string      interface                                           = 3;
+    }
+}
+
+
+// [brief]: Message definition for source options configuration
+// [detail]: Either address or interface can be configured.
+message SourceOptions {
+    // [brief]: Either addr or interface must be provided.
+    // [mandatory]:
+    oneof source_options {
+        // [brief]: Only IPV4 address is supported without prefix length.
+        NetworkAddress address                           = 1;
+
+        // [brief]: Source interface configuration
+        string      interface                                           = 2;
+    }
+}
+
+
+// [brief]: Message definition for destination options configuration for vxlan-gpe encapsualtion.
+// [detail]: Either both or atleast one of the attribute must be provided.
+message DestinationOptionsVxlangpe {
+    // [brief]: Destination address configuration.
+    //          Only IPV4 address is supported without prefix length.
+    NetworkAddress address                               = 1;
+
+    // [brief]:  Destination mac-address [not supported]
+    // [detail]: This field is not supported as of now. It is for future use
+    // only. Any value provided in this field will be ignored.
+    jnx.jet.common.MacAddress       mac_address                         = 2;
+}
+
+
+// [brief]: Message definition for destination options configuration
+// [detail]: Only address is supported.
+message DestinationOptions {
+    // [brief]: Destination address configuration.
+    //          Only IPV4 address is supported without prefix length.
+    NetworkAddress address                               = 1;
+}
+
+// [brief]: Message definition for VXLAN-GPE encap for FTI.
+// [detail]: All the attributes are mandatory.
+message FtiEncapVxlanGpeOptions {
+    // [brief]: source address or interface configuration.
+    // [mandatory]:
+    SourceOptionsVxlangpe   source                                       = 1;
+
+    // [brief]: destination address or interface configuration.
+    // [mandatory]:
+    DestinationOptionsVxlangpe  destination                              = 2;
+
+    // [brief]: tunnel-endpoint type
+    // [detail]: currently on vxlan is supported
+    // [mandatory]:
+    string          tunnel_endpoint                                      = 3;
+
+    // [brief]: destination-udp-port number
+    // [range]: 1:65535
+    // [mandatory]:
+    uint32          destination_udp_port                                  = 4;
+
+    // [brief]: vni number
+    // [range]: 0:16777214
+    // [mandatory]:
+    uint32          vni                                                   = 5;
+}
+
+// [brief]: Message definition for IPIP encap for FTI.
+// [detail]: All the attributes are mandatory.
+message FtiEncapIpipOptions {
+    // [brief]: source address or interface configuration.
+    // [mandatory]:
+    SourceOptions   source                                                = 1;
+
+    // [brief]: destination address or interface configuration.
+    // [mandatory]:
+    DestinationOptions  destination                                       = 2;
+
+    // [brief]: Time to live
+    // applicable to EVO platform only
+    // [range]: 1:255
+    uint32 ttl                                                             = 3;
+
+    // [brief]: Type of tunnel bypass_loopback or tunnel_terminate
+    // applicable to EVO platform only
+    jnx.jet.common.BypassOrTerminate  bypass_or_terminate                                = 4;
+
+    // [brief]: tunnel routing instance name
+    // applicable to EVO platform only
+    // [detail]: if tunnel is part of some routing instance, name of routing
+    // instance need to be given here
+    string tunnel_ri                                                      = 5;
+
+}
+
+// [brief]: Message definition for UDP encap for FTI.
+// [detail]: All the attrbutes are mandatory.
+message FtiEncapUdpOptions {
+    // [brief]: source address or interface configuration.
+    // [mandatory]:
+    SourceOptions   source                                                = 1;
+
+    // [brief]: destination address or interface configuration.
+    // [mandatory]:
+    DestinationOptions  destination                                       = 2;
+
+    // [brief]: Time to live
+    // applicable to EVO platform only
+    // [range]: 1:255
+    uint32 ttl                                                             = 3;
+
+    // [brief]: Type of tunnel bypass or tunnel_terminate
+    // applicable to EVO platform only
+    jnx.jet.common.BypassOrTerminate  bypass_or_terminate                                = 4;
+
+    // [brief]: payload port profile for tunnel
+    // applicable to EVO platform only
+    // [detail]: name of payload port profile ,tunnel is part of
+    string payload_port_profile                                           = 5;
+
+    // [brief]: tunnel routing instance name
+    // applicable to EVO platform only
+    // [detail]: if tunnel is part of some routing instance, name of routing
+    // instance need to be given here
+    string tunnel_ri                                                      = 6;
+}
+
+// [brief]: Message definition for GRE encap for FTI.
+// applicable to EVO platform only
+// [detail]: All the attrbutes are mandatory.
+message FtiEncapGreOptions {
+    // [brief]: source address or interface configuration.
+    // [mandatory]:
+    SourceOptions   source                                                              = 1;
+
+       // [brief]: destination address or interface configuration.
+   DestinationOptions  destination                                                      = 2;
+
+   // [brief]: Time to live
+   // [range]: 1:255
+   uint32 ttl                                                                          = 3;
+
+   // [brief]: Key for GRE tunnel
+   uint32 key                                                                           = 4;
+
+   // [brief]: tunnel routing instance name
+   // [detail]: if tunnel is part of some routing instance , name of routing
+   //  instance need to be given here
+   string  tunnel_ri                                                                    = 5;
+
+   // [brief]: Type of tunnel bypass or tunnel_terminate
+   jnx.jet.common.BypassOrTerminate bypass_or_terminate                                 = 6;
+
+}
+
+// [brief]: Message definition for FTI encapsulation options
+// [detail]: FTI encapsulation configuration can be provided through this.
+message FtiEncapOptions {
+    // [brief]: Tunnel encapsulation for FTI interfaces
+    // [mandatory]:
+    oneof options {
+        // [brief]: vxlan-gpe encapsulation attributes
+        // [detail]: Supported on MX and QFX5110, QFX5120 routers.
+        FtiEncapVxlanGpeOptions     vxlan_gpe                       = 1;
+
+        // [brief]: ipip encapsualtion attributes
+        // [detail]: Supported on PTX series, MX series and QFX10002 routers.
+        FtiEncapIpipOptions         ipip                            = 2;
+
+        // [brief]: udp encapsulation attributes
+        // [detail]: Supported on PTX series and QFX10002 routers.
+        FtiEncapUdpOptions          udp                             = 3;
+
+        // [brief]: gre encapsulation attributes
+        // [detail]: Supported on PTX 10008
+        FtiEncapGreOptions          gre                             = 4;
+    }
+}
+
+
+// [brief]: Message definition for Tunnel attributes or FTI encapsulation
+// [detail]: This definition can be used to send generic tunnel attributes for
+//          tunnel interfaces or encapsulation attributes in the special case
+//          of FT interface.
+message TunnelOptions {
+    // [brief]: Configuration for tunnel attributes or fti encapsulation
+    // [mandatory]:
+    oneof options {
+        // [brief]: FTI encapsulation configurations must be provided through this.
+        FtiEncapOptions     encapsulation                                  = 1;
+    }
+}
+
+// [brief]:  Message definition for the interface unit object.
+// [detail]: This defintion would be used to send the interface unit configuration
+// information using the API.
+message InterfaceUnitConfig {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface unit number
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: List of optional attributes that can be configured
+    // [detail]: For top level interface object the attributes that can be configured
+    // are as below
+    // String Attributes:
+    //
+    // Integer Attributes
+    //     vlan-id - vlan-id to be configured on the interface unit.
+    //            For configuring vlan-id on an interface unit, "vlan-tagging" should
+    //            be set on the interface from CLI.
+    InterfaceAttributeList attributes                                           = 3;
+
+    // [brief]: Configuration under tunnel stanza
+    TunnelOptions    tunnel                                                     = 4;
+}
+
+
+
+// [brief]:  Message definition for the interface family object.
+// [detail]: This defintion would be used to send the interface family configuration
+// information using the API.
+message InterfaceFamilyConfig {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface unit number
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family to be configured for the interface
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+
+    // [brief]: List of optional attributes that can be configured
+    // [detail]: For top level interface object the attributes that can be configured are as below
+    // String Attributes:
+    //
+    // Integer Attributes
+    //
+    InterfaceAttributeList attributes                                           = 4;
+}
+
+
+
+// [brief]:  Message definition for the interface address object.
+// [detail]: This defintion would be used to send the interface address configuration
+// information using the API.
+message InterfaceAddressConfig {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface unit number
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family to be configured for the interface
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+
+    // [brief]:  IP address to be configured.
+    // [detail]: IP address to be configured for the interface IP address can be IPV4
+    // or IPV6 based on the family specified
+    // [mandatory]:
+    jnx.jet.common.IpAddress ip_address                                         = 4;
+
+    // [brief]: List of optional attributes that can be configured
+    // [detail]: For top level interface object the attributes that can be configured are as below
+    // String Attributes:
+    //      mac -  MAC address that should be configured on the address object.
+    //
+    // Integer Attributes
+    //
+    InterfaceAttributeList attributes                                           = 5;
+
+    // [brief]: destination-udp-port for FTI udp encapsulation.
+    // [detail]: This option is applicable only for FTI udp encapsulation.
+    // It will be ignored for all other encapsulations as well as for non FTI.
+    uint32  destination_udp_port                                                = 6;
+}
+
+
+
+// [brief]:  Message definition for the interface arp object.
+// [detail]: This defintion would be used to send the interface arp configuration
+// information using the API.
+message InterfaceArpConfig {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface unit number
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family to be configured for the interface
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+
+    // [brief]:  IP address to be configured for the interface
+    // [detail]: IP address can be IPV4 or IPV6 based on the family specified
+    // [mandatory]:
+    jnx.jet.common.IpAddress ip_address                                         = 4;
+
+    // [brief]:  ARP address to be configured for the interface
+    // [detail]: ARP address can be IPV4 ARP or IPV6 NDP based on the family specified
+    // [mandatory]:
+    jnx.jet.common.IpAddress neighbor_address                                   = 5;
+
+    // [brief]: List of optional attributes that can be configured
+    // [detail]: For top level interface object the attributes that can be configured are as below
+    // String Attributes:
+    //      mac -  ARP/NDP MAC address that should be configured on the arp/ndp object.
+    //             This attribute is mandatory.
+    //
+    // Integer Attributes
+    //     receive - Integer attribute that could be configured on the arp/ndp object.
+    //               This attribute takes boolean value, 0 or 1.
+    InterfaceAttributeList attributes                                           = 6;
+}
+
+
+
+
+// [brief]:  Message definition for response of ADD RPC
+// [detail]: This message defines response that would be retured for the ADD operation
+// for the different interface objects.
+message InterfaceAddResponse   {
+
+    // [brief]:   Possible status codes for ADD RPC operations
+    // [detail]:  This enum defines the different status codes that could be returned
+    // from the backend service processing the API
+    // [default]: SUCCESS_COMPLETED
+    enum StatusCode {
+
+        // [brief]: Operation Completed Succesfully
+        SUCCESS_COMPLETED                                                       = 0;
+
+        // [brief]:  Interface is already configured by another client.
+        // [detail]: This error code is returned when the interface that is being
+        // configured is already configured by another client.
+        NOT_OWNER_OF_OBJECT                                                     = 1;
+
+        // [brief]:  Port name is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // speicfy the port name.
+        PORT_NAME_NOT_SPECIFIED                                                 = 2;
+
+        // [brief]:  unit number is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the unit number for the object.
+        UNIT_NOT_SPECIFIED                                                      = 3;
+
+        // [brief]:  Family is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the family for the object.
+        FAMILY_NOT_SPECIFIED                                                    = 4;
+
+        // [brief]:  IP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the IP address for the object.
+        IP_ADDR_NOT_SPECIFIED                                                   = 5;
+
+        // [brief]:  ARP/NDP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP address for the object.
+        ARP_ADDR_NOT_SPECIFIED                                                  = 6;
+
+        // [brief]:  ARP/NDP MAC Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP MAC address for the object.
+        ARP_MAC_NOT_SPECIFIED                                                   = 7;
+
+        // [brief]:  Interface type specified details sent are not matching.
+        // [detail]: This happens when the interface type specified at the message
+        // level is different from the actual object information that is sent as
+        // part of the message,
+        // Eg: Specifying "Interface Unit" at message level and sending an "Interface
+        // Address" object in the message.
+        INTERFACE_OBJECT_MISMATCH                                               = 8;
+
+        // [brief]: Tunnel config not specified.
+        // [detail]: For tunnel interfaces like FTI, tunnel object should be
+        // specified. This error is thrown when tunnel is not configured for tunnel interfaces.
+        TUNNEL_NOT_SPECIFIED                                                    = 9;
+
+        // [brief]: Tunnel object is not supported.
+        // [detail]: Tunnel object is only suported for FT interfaces as of now.
+        //          May be supported for other tunnel interfaces in the future.
+        TUNNEL_NOT_SUPPORTED                                                    = 10;
+
+        // [brief]: Encapsulation under tunnel is not supported.
+        // [detail]: This status is returned when encapsulation under tunnel
+        // is configured for unsupported interfaces. It is supported only for
+        // FT interfaces.
+        TUNNEL_ENCAP_NOT_SUPPORTED                                              = 11;
+
+        // [brief]: Encapsulation under tunnel is not specified.
+        // [detail]: For FTI interfaces, encapsulation under tunnel object should
+        // be specified. This status is returned when encapsulation under tunnel
+        // is missing
+        TUNNEL_ENCAP_NOT_SPECIFIED                                              = 12;
+
+        // [brief]: Source under tunnel encapsulation is not specified.
+        // [detail]:
+        TUNNEL_ENCAP_SOURCE_NOT_SPECIFIED                                       = 13;
+
+        // [brief]: Source address cannot be IPV6 address.
+        // [detail]: Only IPV4 address is allowed as source address.
+        TUNNEL_ENCAP_SRC_IPV6_ADDR_NOT_SUPPORTED                                = 14;
+
+        // [brief]: Prefix length is not supported for source address.
+        // [detail]: Only host IPV4 address withough prefix length is allowed
+        //  as source address.
+        TUNNEL_ENCAP_SRC_ADDR_SUBNET_MASK_NOT_ALLOWED                           = 15;
+
+        // [brief]: Destination under tunnel encapsulation is not specified.
+        TUNNEL_ENCAP_DEST_NOT_SPECIFIED                                         = 16;
+
+        // [brief]: Destination address cannot be IPV6 address.
+        // [detail]: Only IPV4 address is allowed as destination address.
+        TUNNEL_ENCAP_DEST_IPV6_ADDR_NOT_SUPPORTED                               = 17;
+
+        // [brief]: Prefix length is not supported for destination address.
+        // [detail]: Only host IPV4 address withough prefix length is allowed
+        //  as destination address.
+        TUNNEL_ENCAP_DEST_ADDR_SUBNET_MASK_NOT_ALLOWED                          = 18;
+
+        // [brief]: VNI under tunnel encapsulation is not specified.
+        // [detail]: Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_VNI_NOT_SPECIFIED                                          = 19;
+
+        // [brief]: tunnel-endpoint under tunnel encapsulation is not specified.
+        // [detail]: Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_TUNNEL_ENDPOINT_NOT_SPECIFIED                              = 20;
+
+        // [brief]: destination-udp-port under tunnel encapsualtion is not specified.
+        // [detail]:  Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_DEST_UDP_PORT_NOT_SPECIFIED                                = 21;
+
+        // [brief]: Tunnel encapsulation specified is not supported on the
+        // current platform.
+        // [detail]: For a list of platforms on which each tunnel
+        // encapsulation is available, check the documentation of FtiEncapOptions
+        TUNNEL_ENCAP_TYPE_NOT_SUPPORTED_ON_PLATFORM                             = 22;
+
+        // [brief]: source and destination address are same.
+        // [detail]: applicable to fti only. Source and destination address
+        // cannot be same.
+        TUNNEL_ENCAP_SRC_DEST_ADDR_SAME                                         = 23;
+
+        // [brief]: Operation failed internally.
+        // [detail]: In case of unclassifiable errors, this code is returned.
+        OPERATION_FAILED                                                        = 24;
+
+        // [brief]: Destination address is needed if tunnel-termination is
+        // not configured
+        // [detail]: If tunnel-termination option is not configured then destination
+        // address is must
+        TUNNEL_ENCAP_DEST_ADDR_NOT_SPECIFIED                                    = 25;
+
+        // [brief]: port profile is not specified in UDP encapsulation
+        // applicable to EVO platform only
+        // [detail]: Applicable only to UDP encapsulation
+        TUNNEL_ENCAP_UDP_PORT_PROFILE_MISSING                                   = 26;
+
+
+        // [brief]: wrong family(ISO) specified in UDP encapsulation
+        // applicable to EVO platform only
+        // [detail]: only inet, inet6, mpls family are allowed for UDP tunnel in decap mode
+        TUNNEL_ENCAP_UDP_FAIMLY_NOT_SUPPORTED                                   = 27;
+
+        // [brief]: Invalid subnet mask specified in src address
+        // applicable to EVO platform only
+        // [detail]: Only netmask is allowed for IPv4 is /32 and for IPv6 /128
+        // without tunnel termination
+        TUNNEL_ENCAP_SRC_ADDR_SUBNET_NOT_SUPPORTED                              = 28;
+
+        // [brief]: Invalid subnet mask specified in dest address
+        // applicable to EVO platform only
+        // [detail]: Only netmask is allowed for IPv4 is /32 and for IPv6 /128
+        // without tunnel termination
+        TUNNEL_ENCAP_DEST_ADDR_SUBNET_NOT_SUPPORTED                             = 29;
+
+        // [brief]: Same interface address and src address under tunnel
+        // applicable to EVO platform only
+        // [detail]: same interface addr and src addr under tunnel should
+        // not belong to same subnet
+        TUNNEL_SRC_AND_INTF_ADDR_SAME_SUBNET                                   = 30;
+
+        // [brief]: Same interface address and dest address under tunnel
+        // applicable to EVO platform only
+        // [detail]: same interface addr and dest addr under tunnel should
+        // not belong to same subnet
+        TUNNEL_DEST_AND_INTF_ADDR_SAME_SUBNET                                  = 31;
+
+       // [brief]: Routing Instance doesn't exist
+       // applicable to EVO platform only
+       // [detai]: Routing instance name mentioned in the tunnel doesn't exist
+       TUNNEL_ROUTING_INSTANCE_NOT_PRESENT                                    = 32;
+
+       // [brief]: Src and Dest pair is not unique
+       // applicable to EVO platform only
+       // [detail]: Src and Dest pair should be unique under FTI configs
+        TUNNEL_ENCAP_SRC_DEST_ADDR_NOT_UNIQUE                                 = 33;
+
+       // [brief]: src and dest address is different type
+       // applicable to EVO platform only
+       // [detail]: dest address should match the type of source address
+       TUNNEL_ENCAP_SRC_DEST_DIFF_TYPE                                       = 34;
+
+       // [brief]: only IPv4/IPv6 are allowed as source address
+       // applicable to EVO platform only
+       TUNNEL_ENCAP_SRC_ADDR_FAMILY_NOT_SUPPORTED                            = 35;
+
+      // [brief]: only IPv4/IPv6 are allowed as destination address
+      // applicable to EVO platform only
+      TUNNEL_ENCAP_DEST_ADDR_FAMILY_NOT_SUPPORTED                           = 36;
+
+      // [brief]: Subnet not matching with existing tunnel IFL address subnet
+      // applicable to EVO platform only
+      // [detail]: current Subnet of configured address is not matching with
+      // subnet address of already configured under tunnel IFL
+      TUNNEL_ENCAP_ADDR_SUBNET_NOT_MATCHING                                 = 37;
+
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus             status                                 = 1;
+
+    // [brief]: Status code returned by the backend service.
+    StatusCode                           sub_code                               = 2;
+}
+
+
+
+// [brief]:  Message definition for the ADD RPC
+// [detail]: This message defines the request that would be sent for the ADD operation
+// for the configuring the different interface objects.
+message InterfaceAddRequest {
+
+    // [brief]:  Specifies the interface type that is being configured
+    // [mandatory]:
+    InterfaceType type                                                          = 1;
+
+    // [brief]:  Information about the possible interface objects
+    // [detail]: That could be sent using this message. Only one of the below objects
+    // could be set in a message.The interface object information that is being populated
+    // should be of the same type as the InterfaceType specified above.
+    oneof interface_object {
+
+        // [brief]: Config message for top level interface object
+        InterfaceConfig interfaces                                              = 2;
+
+        // [brief]: Config message for interface unit object
+        InterfaceUnitConfig unit                                                = 3;
+
+        // [brief]: Config message for interface family object
+        InterfaceFamilyConfig family                                            = 4;
+
+        // [brief]: Config message for interface address object
+        InterfaceAddressConfig address                                          = 5;
+
+        // [brief]: Config message for interface ARP/NDP object
+        InterfaceArpConfig arp                                                  = 6;
+    }
+}
+
+
+
+// [brief]:  Message definition for response of UPDATE RPC
+// [detail]: This message defines response that would be retured for the UPDATE operation
+// for the different interface objects.
+message InterfaceUpdateResponse   {
+
+    // [brief]:   Possible status codes for UPDATE RPC operations
+    // [detail]:  This enum defines the different status codes that could be returned
+    // from the backend service processing the API
+    // [default]: SUCCESS_COMPLETED
+    enum StatusCode {
+
+        // [brief]: Operation Completed Succesfully
+        SUCCESS_COMPLETED                                                       = 0;
+
+        // [brief]:  Interface is already configured by another client.
+        // [detail]: This error code is returned when the interface that is being
+        // configured is already configured by another client.
+        NOT_OWNER_OF_OBJECT                                                     = 1;
+
+        // [brief]:  Port name is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // speicfy the port name.
+        PORT_NAME_NOT_SPECIFIED                                                 = 2;
+
+        // [brief]:  unit number is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the unit number for the object.
+        UNIT_NOT_SPECIFIED                                                      = 3;
+
+        // [brief]:  Family is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the family for the object.
+        FAMILY_NOT_SPECIFIED                                                    = 4;
+
+        // [brief]:  IP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the IP address for the object.
+        IP_ADDR_NOT_SPECIFIED                                                   = 5;
+
+        // [brief]:  ARP/NDP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP address for the object.
+        ARP_ADDR_NOT_SPECIFIED                                                  = 6;
+
+        // [brief]:  ARP/NDP MAC Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP MAC address for the object.
+        ARP_MAC_NOT_SPECIFIED                                                   = 7;
+
+        // [brief]:  Interface type specified details sent are not matching.
+        // [detail]: This happens when the interface type specified at the message
+        // level is different from the actual object information that is sent as part
+        // of the message,
+        // Eg: Specifying "Interface Unit" at message level and sending an "Interface
+        // Address" object in the message.
+        INTERFACE_OBJECT_MISMATCH                                               = 8;
+
+        // [brief]: Tunnel config not specified.
+        // [detail]: For tunnel interfaces like FTI, tunnel object should be
+        // specified. This error is thrown when tunnel is not configured for tunnel interfaces.
+        TUNNEL_NOT_SPECIFIED                                                    = 9;
+
+        // [brief]: Tunnel object is not supported.
+        // [detail]: Tunnel object is only suported for FT interfaces as of now.
+        //          May be supported for other tunnel interfaces in the future.
+        TUNNEL_NOT_SUPPORTED                                                    = 10;
+
+        // [brief]: Encapsulation under tunnel is not supported.
+        // [detail]: This status is returned when encapsulation under tunnel
+        // is configured for unsupported interfaces. It is supported only for
+        // FT interfaces.
+        TUNNEL_ENCAP_NOT_SUPPORTED                                              = 11;
+
+        // [brief]: Encapsulation under tunnel is not specified.
+        // [detail]: For FTI interfaces, encapsulation under tunnel object should
+        // be specified. This status is returned when encapsulation under tunnel
+        // is missing
+        TUNNEL_ENCAP_NOT_SPECIFIED                                              = 12;
+
+        // [brief]: Source under tunnel encapsulation is not specified.
+        // [detail]:
+        TUNNEL_ENCAP_SOURCE_NOT_SPECIFIED                                       = 13;
+
+        // [brief]: Source address cannot be IPV6 address.
+        // [detail]: Only IPV4 address is allowed as source address.
+        TUNNEL_ENCAP_SRC_IPV6_ADDR_NOT_SUPPORTED                                = 14;
+
+        // [brief]: Prefix length is not supported for source address.
+        // [detail]: Only host IPV4 address withough prefix length is allowed
+        //  as source address.
+        TUNNEL_ENCAP_SRC_ADDR_SUBNET_MASK_NOT_ALLOWED                           = 15;
+
+        // [brief]: Destination under tunnel encapsulation is not specified.
+        TUNNEL_ENCAP_DEST_NOT_SPECIFIED                                         = 16;
+
+        // [brief]: Destination address cannot be IPV6 address.
+        // [detail]: Only IPV4 address is allowed as destination address.
+        TUNNEL_ENCAP_DEST_IPV6_ADDR_NOT_SUPPORTED                               = 17;
+
+        // [brief]: Prefix length is not supported for destination address.
+        // [detail]: Only host IPV4 address withough prefix length is allowed
+        //  as destination address.
+        TUNNEL_ENCAP_DEST_ADDR_SUBNET_MASK_NOT_ALLOWED                          = 18;
+
+        // [brief]: VNI under tunnel encapsulation is not specified.
+        // [detail]: Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_VNI_NOT_SPECIFIED                                          = 19;
+
+        // [brief]: tunnel-endpoint under tunnel encapsulation is not specified.
+        // [detail]: Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_TUNNEL_ENDPOINT_NOT_SPECIFIED                              = 20;
+
+        // [brief]: destination-udp-port under tunnel encapsualtion is not specified.
+        // [detail]:  Applicable only to vxlan-gpe encapsulation.
+        TUNNEL_ENCAP_DEST_UDP_PORT_NOT_SPECIFIED                                = 21;
+
+        // [brief]: Tunnel encapsulation specified is not supported on the
+        // current platform.
+        // [detail]: For a list of platforms on which each tunnel
+        // encapsulation is available, check the documentation of FtiEncapOptions
+        TUNNEL_ENCAP_TYPE_NOT_SUPPORTED_ON_PLATFORM                             = 22;
+
+        // [brief]: source and destination address are same.
+        // [detail]: applicable to fti only. Source and destination address
+        // cannot be same.
+        TUNNEL_ENCAP_SRC_DEST_ADDR_SAME                                         = 23;
+
+        // [brief]: Operation failed internally.
+        // [detail]: In case of unclassifiable errors, this code is returned.
+        OPERATION_FAILED                                                        = 24;
+
+        // [brief]: Destination address is needed if tunnel-termination is
+        // not configured
+        // [detail]: If tunnel-termination option is not configured then destination
+        // address is must
+        TUNNEL_ENCAP_DEST_ADDR_NOT_SPECIFIED                                    = 25;
+
+        // [brief]: port profile is not specified in UDP encapsulation
+        // applicable to EVO platform only
+        // [detail]: Applicable only to UDP encapsulation
+        TUNNEL_ENCAP_UDP_PORT_PROFILE_MISSING                                   = 26;
+
+
+        // [brief]: wrong family(ISO) specified in UDP encapsulation
+        // applicable to EVO platform only
+        // [detail]: only inet, inet6, mpls family are allowed for UDP tunnel in decap mode
+        TUNNEL_ENCAP_UDP_FAIMLY_NOT_SUPPORTED                                   = 27;
+
+        // [brief]: Invalid subnet mask specified in src address
+        // applicable to EVO platform only
+        // [detail]: Only netmask is allowed for IPv4 is /32 and for IPv6 /128
+        // without tunnel termination
+        TUNNEL_ENCAP_SRC_ADDR_SUBNET_NOT_SUPPORTED                              = 28;
+
+        // [brief]: Invalid subnet mask specified in dest address
+        // applicable to EVO platform only
+        // [detail]: Only netmask is allowed for IPv4 is /32 and for IPv6 /128
+        // without tunnel termination
+        TUNNEL_ENCAP_DEST_ADDR_SUBNET_NOT_SUPPORTED                             = 29;
+
+        // [brief]: Same interface address and src address under tunnel
+        // applicable to EVO platform only
+        // [detail]: same interface addr and src addr under tunnel should
+        // not belong to same subnet
+        TUNNEL_SRC_AND_INTF_ADDR_SAME_SUBNET                                   = 30;
+
+        // [brief]: Same interface address and dest address under tunnel
+        // applicable to EVO platform only
+        // [detail]: same interface addr and dest addr under tunnel should
+        // not belong to same subnet
+        TUNNEL_DEST_AND_INTF_ADDR_SAME_SUBNET                                  = 31;
+
+       // [brief]: Routing Instance doesn't exist
+       // applicable to EVO platform only
+       // [detai]: Routing instance name mentioned in the tunnel doesn't exist
+       TUNNEL_ROUTING_INSTANCE_NOT_PRESENT                                    = 32;
+
+       // [brief]: Src and Dest pair is not unique
+       // applicable to EVO platform only
+       // [detail]: Src and Dest pair should be unique under FTI configs
+        TUNNEL_ENCAP_SRC_DEST_ADDR_NOT_UNIQUE                                 = 33;
+
+       // [brief]: src and dest address is different type
+       // applicable to EVO platform only
+       // [detail]: dest address should match the type of source address
+       TUNNEL_ENCAP_SRC_DEST_DIFF_TYPE                                       = 34;
+
+       // [brief]: only IPv4/IPv6 are allowed as source address
+       // applicable to EVO platform only
+       TUNNEL_ENCAP_SRC_ADDR_FAMILY_NOT_SUPPORTED                            = 35;
+
+      // [brief]: only IPv4/IPv6 are allowed as destination address
+      // applicable to EVO platform only
+      TUNNEL_ENCAP_DEST_ADDR_FAMILY_NOT_SUPPORTED                           = 36;
+
+      // [brief]: Subnet not matching with existing tunnel IFL address subnet
+      // applicable to EVO platform only
+      // [detail]: current Subnet of configured address is not matching with
+      // subnet address of already configured under tunnel IFL
+      TUNNEL_ENCAP_ADDR_SUBNET_NOT_MATCHING                                 = 37;
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus             status                                 = 1;
+
+    // [brief]: Status code returned by the backend service.
+    StatusCode                           sub_code                               = 2;
+}
+
+
+
+// [brief]:  Message definition for the UPDATE RPC
+// [detail]: This message defines the request that would be sent for the UPDATE operation
+// for the configuring the different interface objects.
+message InterfaceUpdateRequest {
+
+    // [brief]:  Specifies the interface type that is being configured
+    // [mandatory]:
+    InterfaceType type                                                          = 1;
+
+    // [brief]:  Information about the possible interface objects
+    // [detail]: That could be sent using this message. Only one of the below objects
+    // could be set in a message.
+    // The interface object information that is being populated should
+    // be of the same type as the InterfaceType specified above.
+    oneof interface_object {
+
+        // [brief]: Config message for top level interface object
+        InterfaceConfig interfaces                                              = 2;
+
+        // [brief]: Config message for interface unit object
+        InterfaceUnitConfig unit                                                = 3;
+
+        // [brief]: Config message for interface family object
+        InterfaceFamilyConfig family                                            = 4;
+
+        // [brief]: Config message for interface address object
+        InterfaceAddressConfig address                                          = 5;
+
+        // [brief]: Config message for interface ARP/NDP object
+        InterfaceArpConfig arp                                                  = 6;
+    }
+}
+
+
+
+// [brief]:  Message definition for response of DELETE RPC
+// [detail]: This message defines response that would be retured for the DELETE operation
+// for the different interface objects.
+message InterfaceDeleteResponse   {
+
+    // [brief]:   Possible status codes for DELETE RPC operations
+    // [detail]:  This enum defines the different status codes that could be returned
+    // from the backend service processing the API
+    // [default]: SUCCESS_COMPLETED
+    enum StatusCode {
+
+        // [brief]: Operation Completed Succesfully
+        SUCCESS_COMPLETED                                                       = 0;
+
+        // [brief]:  Interface is already configured by another client.
+        // [detail]: This error code is returned when the interface that is being
+        // configured is already configured by another client.
+        NOT_OWNER_OF_OBJECT                                                     = 1;
+
+        // [brief]:  Port name is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // speicfy the port name.
+        PORT_NAME_NOT_SPECIFIED                                                 = 2;
+
+        // [brief]:  unit number is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the unit number for the object.
+        UNIT_NOT_SPECIFIED                                                      = 3;
+
+        // [brief]:  Family is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the family for the object.
+        FAMILY_NOT_SPECIFIED                                                    = 4;
+
+        // [brief]:  IP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the IP address for the object.
+        IP_ADDR_NOT_SPECIFIED                                                   = 5;
+
+        // [brief]:  ARP/NDP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP address for the object.
+        ARP_ADDR_NOT_SPECIFIED                                                  = 6;
+
+        // [brief]:  ARP/NDP MAC Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the ARP/NDP MAC address for the object.
+        ARP_MAC_NOT_SPECIFIED                                                   = 7;
+
+        // [brief]:  Interface type specified details sent are not matching.
+        // [detail]: This happens when the interface type specified at the message
+        // level is different from the actual object information that  is sent as part
+        // of the message,
+        // Eg: Specifying "Interface Unit" at message level and sending an "Interface
+        // Address" object in the message.
+        INTERFACE_OBJECT_MISMATCH                                               = 8;
+
+        // [brief]:  Specified interface object is not found
+        // [detail]: This error code is returned when the interface object that is to
+        // be deleted is not configured
+        OBJECT_NOT_FOUND                                                        = 9;
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus             status                                 = 1;
+
+    // [brief]: Status code returned by the backend service.
+    StatusCode                           sub_code                               = 2;
+}
+
+
+
+// [brief]:  Message definition for the Interface DELETE request
+// [detail]: This message specifies the top level interface object that has to be deleted.
+message InterfaceDelete {
+
+    // [brief]: Port name of the interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Any optional interface specific options.
+    InterfaceSpecificOptions interface_options                                  = 2;
+}
+
+
+
+// [brief]:  Message definition for the Interface unit DELETE request
+// [detail]: This message specifies the interface unit object that has to be deleted.
+message InterfaceUnitDelete {
+
+    // [brief]: Port name of the interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Unit number of the interface
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+}
+
+
+
+// [brief]:  Message definition for the Interface family DELETE request
+// [detail]: This message specifies the interface family object that has to be deleted.
+message InterfaceFamilyDelete {
+
+    // [brief]: Port name of the interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Unit number of the interface
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family of the interface. This could be IPv4 of IPv6 family
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+}
+
+
+
+// [brief]:  Message definition for the Interface address DELETE request
+// [detail]: This message specifies the interface address object that has to be deleted.
+message InterfaceAddressDelete {
+
+    // [brief]: Port name of the interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Unit number of the interface
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family of the interface. This could be IPv4 of IPv6 family
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+
+    // [brief]:  IP address to be deleted.
+    // [detail]: This address could beIPv4 or IPv6, but it should match with the family
+    // specified above.
+    // [mandatory]:
+    jnx.jet.common.IpAddress ip_address                                         = 4;
+}
+
+
+
+// [brief]:  Message definition for the ARP/NDP address DELETE request
+// [detail]: This message specifies the interface address object that has to be deleted.
+message InterfaceArpDelete {
+
+    // [brief]: Port name of the interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Unit number of the interface
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+
+    // [brief]: Protocol family of the interface. This could be IPv4 of IPv6 family
+    // [mandatory]:
+    jnx.jet.common.AfType family                                                = 3;
+
+    // [brief]:  IP address to be deleted.
+    // [detail]: This address could beIPv4 or IPv6, but it should match with the
+    // family specified above.
+    // [mandatory]:
+    jnx.jet.common.IpAddress ip_address                                         = 4;
+
+    // [brief]: ARP/NDP address to be deleted.
+    // [detail]: This address could be IPv4 or IPv6, but it should match with the
+    // family specified above.
+    // [mandatory]:
+    jnx.jet.common.IpAddress neighbor_address                                   = 5;
+
+    // [brief]: ARP/NDP attribute to be deleted.
+    // [mandatory]:
+    InterfaceAttributeList attributes                                           = 6;
+}
+
+
+
+// [brief]:  Message definition for the DELETE RPC
+// [detail]: This message defines the request that would be sent for the DELETE operation
+// for the configuring the different interface objects.
+message InterfaceDeleteRequest {
+
+    // [brief]:  Specifies the interface type that is being deleted
+    // [mandatory]:
+    InterfaceType type                                                          = 1;
+
+    // [brief]:  Information about one of the interface objects that this message represents.
+    // [detail]: The information populated for any of possible objects should be in sync
+    // with the object_type defined above.
+    oneof interface_object {
+
+        // [brief]: Delete message for top level interface object
+        InterfaceDelete interfaces                                              = 2;
+
+        // [brief]: Delete message for interface unit object
+        InterfaceUnitDelete unit                                                = 3;
+
+        // [brief]: Delete message for interface family object
+        InterfaceFamilyDelete family                                            = 4;
+
+        // [brief]: Delete message for interface address object
+        InterfaceAddressDelete address                                          = 5;
+
+        // [brief]: Delete message for interface ARP/NDP object
+        InterfaceArpDelete arp                                                  = 6;
+    }
+}
+
+
+
+// [brief]:  Enumeration definitions for the different interface objects
+// [detail]: Enumeration definitions for the different interface object types that could
+// be used in the APIs. When the RPC message is sent by client for different interface
+// objects, the object type should be mentioned in the message so that the server could
+// handle the message appropriately based on the interface object type.
+// [default]: TYPE_INTERFACE_OBJECT
+enum InterfaceType {
+
+    // [brief]: Definition for top level interface object
+    TYPE_INTERFACE_OBJECT                                                       = 0;
+
+    // [brief]: Definition for interface unit object
+    TYPE_INTERFACE_UNIT_OBJECT                                                  = 1;
+
+    // [brief]: Definition for interface family object
+    TYPE_INTERFACE_FAMILY_OBJECT                                                = 2;
+
+    // [brief]: Definition for interface IP address object
+    TYPE_INTERFACE_ADDRESS_OBJECT                                               = 3;
+
+    // [brief]: Definition for interface ARP/NDP object
+    TYPE_INTERFACE_ARP_OBJECT                                                   = 4;
+}
+
+
+// [brief]:  Message definition for the GET RPC
+// [detail]: This message would hold the details for only one of the interface object
+// at any point of time. The information would be populated by the server and sent to
+// client
+message InterfaceGetResponse {
+
+    // [brief]:   Possible status codes for GET RPC operations
+    // [detail]:  This enum defines the different status codes that could be returned
+    // from the backend service processing the API
+    // [default]: SUCCESS_COMPLETED
+    enum StatusCode {
+
+        // [brief]: Operation Completed Succesfully
+        SUCCESS_COMPLETED                                                       = 0;
+
+        // [brief]:  Specified interface object is not found
+        // [detail]: This error code is returned when the interface object is not
+        // configured
+        OBJECT_NOT_FOUND                                                        = 1;
+
+        // [brief]:  Port name is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // speicfy the port name.
+        PORT_NAME_NOT_SPECIFIED                                                 = 2;
+
+        // [brief]:  unit number is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // specify the unit number for the object.
+        UNIT_NOT_SPECIFIED                                                      = 3;
+
+        // [brief]:  Family is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // contain the family specified.
+        FAMILY_NOT_SPECIFIED                                                    = 4;
+
+        // [brief]:  IP Address is not specified for the object
+        // [detail]: This error code is returned when the connfig message does not
+        // contain the IP address specified.
+        IP_ADDR_NOT_SPECIFIED                                                   = 5;
+
+        // [brief]:  ARP/NDP Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // contain the ARP/NDP address specified.
+        ARP_ADDR_NOT_SPECIFIED                                                  = 6;
+
+        // [brief]:  ARP/NDP MAC Address is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // contain the ARP/NDP MAC address specified.
+        ARP_MAC_NOT_SPECIFIED                                                   = 7;
+
+        // [brief]:  Interface type specified details sent are not matching.
+        // [detail]: This happens when the interface type specified at the message
+        // level is different from the actual object information that is sent as
+        // part of the message,
+        // Eg: Specifying "Interface Unit" at message level and sending an "Interface
+        // Address" object in the message.
+        INTERFACE_OBJECT_MISMATCH                                               = 8;
+    }
+
+    // [brief]:  Specifies the interface type that is being returned.
+    // [mandatory]:
+    InterfaceType type                                                          = 1;
+
+    // [brief]:  Information about one of the interface objects that was requested.
+    // [detail]: The information for the requested object would be populated in the
+    // below interface object. The type of the object populated would be mentioned
+    // in the InterfaceType flag above.
+    oneof interface_object {
+        // [brief]: Config message for interface object
+        InterfaceConfig interfaces                                              = 2;
+
+        // [brief]: Config message for interface unit object
+        InterfaceUnitConfig unit                                                = 3;
+
+        // [brief]: Config message for interface family object
+        InterfaceFamilyConfig family                                            = 4;
+
+        // [brief]: Config message for interface address object
+        InterfaceAddressConfig address                                          = 5;
+
+        // [brief]: Config message for interface ARP/NDP object
+        InterfaceArpConfig arp                                                  = 6;
+    }
+
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus          status                                    = 7;
+
+    // [brief]: Status code returned by the backend service.
+    StatusCode                        sub_code                                  = 8;
+}
+
+
+
+// [brief]:  Message definition for the GET RPC
+// [detail]: This message defines the request that would be sent for the GET operation
+// for the configuring the different interface objects.
+message InterfaceGetRequest {
+
+    // [brief]: Interface object type this config object represents.
+    // [mandatory]:
+    InterfaceType type                                                          = 1;
+
+    // [brief]:  Information about one of the interface objects that this message represents.
+    // [detail]: The information populated for any of possible objects should be in sync with
+    // the object_type defined above.
+    oneof interface_object {
+        // [brief]: Config message for interface object
+        InterfaceConfig interfaces                                              = 2;
+
+        // [brief]: Config message for interface unit object
+        InterfaceUnitConfig unit                                                = 3;
+
+        // [brief]: Config message for interface family object
+        InterfaceFamilyConfig family                                            = 4;
+
+        // [brief]: Config message for interface address object
+        InterfaceAddressConfig address                                          = 5;
+
+        // [brief]: Config message for interface ARP/NDP object
+        InterfaceArpConfig arp                                                  = 6;
+    }
+}
+
+
+
+// [brief]:  Message defination for checking Permisssion.
+// [detail]: Message definition for checking the following
+// - Whether the Interface Unit is created by CLI and not modified by any client
+// - Whether the Interface Unit is modified by the client making this query
+message InterfaceUnitPermissionsGetRequest {
+
+    // [brief]: Port name of the Interface
+    // [mandatory]:
+    string port_name                                                            = 1;
+
+    // [brief]: Interface unit number
+    // [mandatory]:
+    InterfaceUnit  unit                                                         = 2;
+}
+
+
+
+// [brief]: Respose message for InterfaceUnitPermissionsGetRequest.
+// [detail]: The response message has the following information
+// - Interface Unit is a CLI created unit and no client has modified it
+// - Interface Unit is modified by the client making this query.
+message InterfaceUnitPermissionsGetResponse {
+
+    // [brief]:   This is an enum status code for permission response
+    // [detail]:  This enum defines the different status codes that could be returned
+    // from the backend service processing the API
+    // [default]: SUCCESS_COMPLETED
+    enum  StatusCode {
+
+        // [brief]: Completed Succesfully
+        SUCCESS_COMPLETED                                                       = 0;
+
+        //  [brief]: Requested object is NOT configured.
+        OBJECT_NOT_FOUND                                                        = 1;
+
+        // [brief]:  Port name is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // contain the port name.
+        // Error case
+        PORT_NAME_NOT_SPECIFIED                                                 = 2;
+
+        // [brief]:  unit number is not specified for the object
+        // [detail]: This error code is returned when the config message does not
+        // contain the unit number.
+        // Error case
+        UNIT_NOT_SPECIFIED                                                      = 3;
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus                      status                        = 1;
+
+    // [brief]: Status code returned by the backend service.
+    StatusCode                                    sub_code                      = 2;
+
+    // [brief]:  Specifies whether current client created this IFL using API
+    // [detail]: If this IFL was created by the current client using API, then this
+    // field would be set to TRUE.
+    bool                         is_owner                                       = 3;
+
+    // [brief]:  Specifies if this IFL is created using API or not.
+    // [detail]: If this IFL is created by a client using API, then this field would
+    // be set to TRUE.
+    bool                         client_created_unit                            = 4;
+
+    // [brief]:  Name of the client that created this IFL using API
+    // [detail]: If this IFL is created by client using API, then this field would
+    // be set to the name of the client that created this IFL
+    // If this IFL is created using API, then this field would be NULL
+    string                       client_name                                    = 5;
+
+}
+
+
+
+// [brief]:  List of RPC defined for the interface services
+// [detail]: These RPCs would be used by the clients to configure the appropriate interface
+// objects
+service Interfaces {
+
+    // [brief]:  RPC for adding an interface object
+    // [detail]: The interface object could be interface, unit, family, address or
+    // ARP/NDP object
+    //
+    // The InterfaceAddRequest message would be populated with the config details and
+    // the InterfaceType  field would be set in the config message by the client to
+    // identify the interface object that is being configured.
+    rpc InterfaceAdd(InterfaceAddRequest) returns (InterfaceAddResponse) {}
+
+    // [brief]:  RPC for updating the attributes/properties of an interface object
+    // [detail]: If the interface object is not yet created, then this RPC would perform
+    // the add operation with the attributes configured.
+    //
+    // The interface object could be interface, unit, family, address or ARP/NDP object
+    //
+    // The InterfaceUpdateRequest message would be populated with the config details
+    // and the InterfaceType field would be set in the config message by the client
+    // to identify the interface object that is being configured.
+    //
+    // For updating the attributes of the object, the attributes that need to be updated
+    // would be populated in the InterfaceUpdateRequest message with the new values
+    // that need to be updated.
+    //
+    // For resetting the values for an attribute (string or integer attribute) the attribute
+    // information would be populated with the attribute name and the value would be
+    // updated as below
+    //
+    // String attributes: No value would be set the for attribute
+    // Integer attributes: Invalid value would be sent for the attribute
+    //
+    //
+    rpc InterfaceUpdate(InterfaceUpdateRequest) returns (InterfaceUpdateResponse) {}
+
+    // [brief]:  RPC for deleting an interface object
+    // [detail]: The interface object could be interface, unit, family, address or
+    // ARP/NDP object
+    //
+    // Using this RPC, the required interface object config could be removed. It is
+    // to be noted when an interface object is deleted, its child objects would be
+    // deleted, but the parent objects would not be deleted.
+    //
+    // Eg: When the interface family object is deleted, the following child objects
+    // would also be deleted, if present
+    //     interface address object
+    //     interface arp object
+    //
+    // The following parent objects would still be present
+    //     interface object
+    //     interface unit object
+    //
+    // The InterfaceDeleteRequest message would be populated with the config details
+    // and the InterfaceType field would be set in the config message by the client
+    // to identify the interface object that is being configured.
+    rpc InterfaceDelete(InterfaceDeleteRequest) returns (InterfaceDeleteResponse ) {}
+
+    // [brief]:  RPC for reading back the details of  an interface object.
+    // [detail]: The interface object could be interface, unit, family, address or
+    // ARP/NDP object
+    //
+    // Using this RPC, the attribute values that are configured on the interface object
+    // could be obtained. Only the attributes that could be configured using RPCs would
+    // be returned as part of this RPC.
+    //
+    // The InterfaceGetRequest  message would be populated with the object details and
+    // the InterfaceType field would be set in the config message by the client to
+    // identify the interface object that is being configured.
+    rpc InterfaceGet(InterfaceGetRequest) returns (InterfaceGetResponse) {}
+
+    // [brief]:  RPC for checking owner/creator/permission of the object
+    // [detail]: RPC for checking for the following
+    //   -  if the specified interface object is owned/created by the client performing
+    //      this query
+    //   -  unit interface object is a public object if it is created from CLI not updated
+    //      by  any clients.
+    //
+    // The interface object should be an Interface Unit object
+    //
+    // When an interface object is configured by a client, the whole of the interface
+    // tree would be owned by the client. Any other client would not be able to make
+    // any configuration changes on the interface tree till the current owner releases
+    // the configurations on the interface tree.
+    rpc InterfaceUnitPermissionsGet(InterfaceUnitPermissionsGetRequest) returns (InterfaceUnitPermissionsGetResponse) {}
+}
