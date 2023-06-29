@@ -1,0 +1,1200 @@
+/*
+ * Public API for the BGP routing services.
+ *
+ * This IDL defines the APIs for the BGP-specific routing services.
+ */
+
+/*
+ *  proto3 is recommended for use with LibJAPI and gRPC
+ */
+syntax = "proto3";
+
+/*
+ * This is part of the routing package.
+ */
+package routing;
+
+/*
+ * Depends on common JNX and RPD API definitions
+ */
+import "jnx_addr.proto";
+import "prpd_common.proto";
+
+
+/* ----------------------------------------------------------------
+ * BGP-specific route types
+ */
+
+/**
+ * Routing protocols
+ */
+enum RouteProtocol {
+
+    /** Unspecified protocol default behavior dependent on API:
+     *  For route change requests, PROTO_BGP_STATIC.
+     *  For route get requests, match either PROTO_BGP or PROTO_BGP_STATIC.
+     */
+    PROTO_UNSPECIFIED = 0;
+
+    /** BGP dynamic routes */
+    PROTO_BGP         = 1;
+
+    /** BGP static programmed routes */
+    PROTO_BGP_STATIC  = 2;
+}
+
+/**
+ * Route Operation Flag values that alter route add behavior.
+ * USE OF THIS TYPE IS DEPRECATED. Instead, use BgpRouteOperationFlags.
+ */
+enum RouteOperation {
+
+    /**
+     * Unspecified Operation, meaning no special operation specified.
+     * USE OF THIS FLAG IS DEPRECATED. Instead, use BgpRouteOperationFlags.
+     */
+    UNSPECIFIED = 0 [deprecated=true];
+
+    /**
+     *  Route operation indicating whether to attach the well-known
+     *  no-advertise community.
+     *  No-advertise has the effect of instructing the route not to
+     *  advertise the route further. The community may alternately be
+     *  included in the community_list.
+     *  USE OF THIS FLAG IS DEPRECATED. Instead, use BgpRouteOperationFlags.
+     */
+    NO_ADVERTISE = 0x01 [deprecated=true];
+
+    /**
+     *  Route operation indicating whether to attach the well-known no-export
+     *  community. No-export has the effect of instructing the router
+     *  not to advertise the route beyond the BGP confederation boundary.
+     *  The community may alternately be included in the community_list.
+     *  USE OF THIS FLAG IS DEPRECATED. Instead, use BgpRouteOperationFlags.
+     */
+    NO_EXPORT   =  0x02 [deprecated=true];
+
+    /**
+     *  Route Operation indicating whether to use NH_REJECT for the route
+     *  This makes sense to be set only when programming route in RR.
+     *  This can be used to save memory when there are a high number of
+     *  unique nexthops.
+     *  USE OF THIS FLAG IS DEPRECATED. Instead, use BgpRouteOperationFlags.
+     */
+    USE_NH_REJECT = 0x04 [deprecated=true];
+
+    /* DO NOT ADD NEW FLAGS HERE! Instead, use BgpRouteOperationFlags. */
+}
+
+/**
+ * Route Operation Flag values that alter route add behavior.
+ *
+ * This data type replaces and deprecates RouteOperation.
+ * New applications should use BgpRouteOperationFlags exclusively and instead
+ * of RouteOperation.
+ *
+ * Backwards compatibility: In BgpRouteUpdateRequest messages, if both
+ * bgp_routes[].route_oper_flags and bgp_routes[].route_flags are initialized,
+ * then only the new route_flags will be processed and the old route_oper_flags
+ * will be ignored. If only  route_oper_flags or route_flags are initialized,
+ * then that initialized  flags message will be processed.
+ * In BgpRouteGetReply and BgpRouteMontiorEntry messages, both the
+ * route_oper_flags and route_flags will be set within the bgp_routes[] and
+ * bgp_route fields (respectively), indicating the same flags.
+ */
+message BgpRouteOperationFlags {
+
+    /**
+     *  Route operation indicating whether to attach the well-known
+     *  no-advertise community.
+     *  No-advertise has the effect of instructing the route not to
+     *  advertise the route further. The community may alternately be
+     *  included in the community_list.
+     */
+    bool no_advertise = 1;
+
+
+    /**
+     *  Route operation indicating whether to attach the well-known no-export
+     *  community. No-export has the effect of instructing the router
+     *  not to advertise the route beyond the BGP confederation boundary.
+     *  The community may alternately be included in the community_list.
+     */
+     bool no_export = 2;
+
+    /**
+     *  Route Operation indicating whether to use NH_REJECT for the route
+     *  This makes sense to be set only when programming route in RR.
+     *  This can be used to save memory when there are a high number of
+     *  unique nexthops.
+     *  use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+     */
+     bool use_nexthop_reject = 3;
+
+    /**
+     *  Route operation flag indicating that the next hop is fictitious.
+     *  use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+     */
+     bool use_nexthop_fictitious = 4;
+
+}
+
+/**
+ * A generic 32-bit unsigned value that implicitly carries an indication
+ * of whether any value has been set or not.
+ */
+message BgpAttrib32 {
+    /** 32-bit unsigned value */
+    uint32 value = 1;
+}
+
+/**
+ * A generic 64-bit unsigned value that implicitly carries an indication
+ * of whether any value has been set or not.
+ */
+message BgpAttrib64 {
+    /** 64-bit unsigned value */
+    uint64 value = 1;
+}
+
+/* -------------------------------------------------------------------
+ * Communities
+ */
+
+/**
+ * A single communty is a string identifying a regular, extended,
+ * or well-known community name or values with no whitepace.
+ *
+ * The communities will be recognized:
+ *
+ * Well-known communities:
+ *    no-export
+ *    no-advertise
+ *    no-export-confed
+ *    llgr-stale
+ *    no-llgr
+ *
+ * RFC 1997 comunities:
+ *    domain-id:ipaddress:0
+ *    domain-id-vendor:
+ *    <n>:<n>
+ *
+ * Route targets extended communities:
+ *    target:ipv4-address:16 bit#
+ *    target:16bit#:32bit#
+ *    target:as2b:16bit#:32bit#
+ *    target:as4b:32bit#:16bit#
+ *
+ * Origin extended communities:
+ *    origin:ipv4-address:16 bit#
+ *    origin:16bit#:32bit#
+ *
+ * Bandwidth management extended communities:
+ *    bandwidth:16bit#:bw
+ *    {traffic-rate}:16 bit#:bw
+ *
+ * Redirect extended communities:
+ *    redirect:ipv4-address:16 bit#
+ *    redirect:16bit#:32bit#
+ *
+ * Tunnel encapsulation extended communities:
+ *    encapsulation:0L:tunnel-type
+ *
+ */
+message Community {
+
+    /** A string that uniquely identifies a single regular, extended, or
+     *  well-known community. A community string must not exceeed
+     *  1023 characters. REQUIRED */
+    string community_string = 1;
+}
+
+/**
+ * A list of communities.
+ */
+message CommunityList {
+
+    /** An unordered list of zero, one, or more individual communities.
+     *  A Community list may not exceed 256 communities */
+    repeated Community com_list = 1;
+}
+
+
+/* -------------------------------------------------------------------
+ * AS Paths
+ */
+
+/**
+ * AS path through which the route was learned.
+ *
+ * An AS Path is a string composed of an series of AS numbers
+ * separated by whitespace special delimiters.
+ * The following special delimiting characters are used for signifying
+ * confederations, confederation-sets, and AS-sets:
+ *
+ *     [ ] - Brackets enclose the local AS number associated with the AS set
+ *     if more than one AS number is configured on the routing device,
+ *     or if AS path prepending is configured.
+ *
+ *     ( ) - Parentheses enclose a confederation.
+ *
+ *     ( [ ] ) - Parentheses and brackets enclose a confederation set.
+ *
+ * Programmed AS Paths implicitly have path origin IGP.
+ */
+message AsPath {
+    /** A string listing AS numbers separated by whitespace and special
+     *  delimiter charaters (see message as-path). An AS Path must not
+     *  exceed 1023 characters. REQUIRED */
+    string aspath_string = 1;
+}
+
+/**
+ * BGP peer type identifies if the associated route as an internal (IBGP)
+ * or external (EBGP) route.
+ */
+enum BgpPeerType {
+    BGP_INTERNAL = 0;  /** IBGP Route */
+    BGP_EXTERNAL = 1;  /** EBGP Route */
+}
+
+/**
+ * Route matching parameters provide the key for identifying
+ * BGP routes. Programmed BGP-Static routes must be unique
+ * for the bgp_route_match paramaters. Dynamic BGP routes may
+ * may have multiple matches to a given set of bgp_route_match
+ * parameters.
+ */
+message BgpRouteMatch {
+
+    /** Destination prefix of the route. REQUIRED */
+    RoutePrefix dest_prefix   = 1;
+
+    /** Destination prefix length in bits. REQUIRED */
+    uint32  dest_prefix_len   = 2;
+
+    /** Route table specified by either name or ID. REQUIRED */
+    RouteTable table          = 3;
+
+    /** Protocol that installed the route in the table. */
+    RouteProtocol protocol    = 4;
+
+    /** Path cookie value differentiates routes with the same destination.
+     *  The cookie may be any unsigned 64-bit value. Optional (default is 0,
+     *  which indicates that cookie is not evaluated for matching)
+     */
+    uint64 path_cookie        = 5;
+
+    /** Commumity string list associated with route. The list could be
+     *  a single/multiple community string or a regular expression.
+     *  This is an optional parameter. If this list is null then all
+     *  route with or without community would be returned.
+     */
+    CommunityList communities = 6;
+}
+
+/**
+ * Message can contain multiple tunnel attributes.
+ */
+message TunnelEncapAttribute {
+    /**
+     * One or more tunnel attributes to add, udpate, or modify.
+     * MANDATORY
+     */
+   repeated TunnelAttribute tunnel_list  = 1;
+}
+/**
+ * Message contains information that is used to form the encapsulation header
+ * for one of the specified tunnel type.
+ */
+message TunnelAttribute {
+    /**
+    * Can contain one of multiple tunnel types.
+    * MANDATORY
+    */
+    oneof TunnelType {
+        /** Attributes specific to IP over IP Tunnel. */
+        IpIpTunnelAttributes ipip_tunnel = 1;
+    }
+}
+
+/**
+ * EgressEndpoint message contains egress_endpoint_address
+ * and in future might contain AS Number
+ */
+message EgressEndpoint {
+    /**
+     * Egress_endpoint_address specifies the address of the egress endpoint of the tunnel,
+     * that is, the address of the router that will decapsulate the payload.
+     * MANDATORY
+     */
+    jnxBase.IpAddress egress_endpoint_address   = 1;
+}
+
+/**
+ * Attributes specific to IP over IP Tunnel
+ */
+message IpIpTunnelAttributes {
+    /**
+     * Egress endpoint of a particular IPIP tunnel.
+     * OPTIONAL, if EgressEndpoint is not specified, IPIP tunnel will use IPv4 nexthop
+     * as the egress endpoint address.
+     */
+    EgressEndpoint egress_endpoint = 1;
+
+    /**
+     * 32-bit color attribute corresponding to the IPIP tunnel.
+     * OPTIONAL, if color is not specified,
+     * IPIP tunnel will not use the color during route resolution
+     */
+    BgpAttrib32 color = 2;
+}
+
+/**
+ * A route entry specifying a single route destination and BGP path
+ * along with the route attributes for that path.
+ */
+message BgpRouteEntry {
+
+    /** Destination prefix of the route. REQUIRED */
+    RoutePrefix dest_prefix             = 1;
+
+    /** Destination prefix length in bits. REQUIRED */
+    uint32  dest_prefix_len             = 2;
+
+    /** Route table specified by either name or ID. REQUIRED */
+    RouteTable table                    = 3;
+
+    /** Protocol that installed the route in the table.
+     *  In get requests, the only valid values are PROTO_UNSPECIFIED or
+     *  PROTO_BGP_STATIC.
+     */
+    RouteProtocol protocol              = 4;
+
+    /** Path cookie value differentiates routes with the same destination.
+     *  The cookie may be any unsigned 64-bit value. Optional (default is 0) */
+    uint64 path_cookie                  = 5;
+
+    /** Route Preference, also known as administrative distance, is a
+     *  unsigned value in the range from 0 through 4,294,967,295 (2^32 -1).
+     *  Lower values of route preference are preferred. Optional (default,
+     *  route preference for programmed BGP-Static routes is 5)
+     */
+    BgpAttrib32 route_preference        = 6;
+
+    /** Local Preference is an unsigned value in the range from
+     *  0 through 4,294,967,295 (2^32 - 1). Higher values of local preference
+     *  are prefered. Optional (default is 100) */
+    BgpAttrib32 local_preference        = 7;
+
+    /** Multi-Exit Discriminator (MED) is an unsigned value in the range
+     *  from 0 through 4,294,967,295 (2^32 -1). Lower values of MED
+     *  are preferred. Optional (by default no MED is advertised) */
+    BgpAttrib32 med                     = 8;
+
+    /** AIGP Distance is an 64-bit unsigned value in the range from 0 through
+     *  (2^64 - 1). Lower values of AIGP distance are preferred.
+     *  Optional (by default, no AIGP distance is advertised) */
+    BgpAttrib64 aigp_distance           = 9;
+
+    /** Label information may be provided either as a single VPN label in
+     *  L3VPN tables, or as a full label stack in BGP-Labeled-Unicast tables.
+     *  BGP-LU tables for L3VPN should provide a label stack with the VPN label
+     *  as the bottom-most label in the stack. Optional (by default, no label
+     *  information is advertised) */
+    oneof LabelInfo {
+
+        /** A valid 20-bit unsigned label value must be less than decimal
+         *  value 1048576 and not within the reserved label range of
+         *  4 through 15 (inclusive). It is not possible to set ToS bits
+         *  in this case. */
+        uint32 vpn_label                = 10;
+
+        /** A properly constructed label stack which may include VPN label
+         *  in addition to a BGP-LU label stack. NOTE: label stack is not
+         *  supported in this release of the API. */
+        LabelStack labels               = 11;
+    }
+
+    /** List of route communities. Optional (by default, no communities are
+     *  advertised. */
+    CommunityList communities           = 12;
+
+    /** AS Path for the route. Optional (by default, no AS path is
+     *  advertised */
+    AsPath aspath                       = 13;
+
+    /** BGP originator ID is a unsigned 32-bit BGP Identifier value,
+     *  as per RFC 6286, encoded in network byte order. Optional
+     * (by default, no originator ID is advertised) */
+    BgpAttrib32 originator_id           = 14;
+
+    /** BGP cluster list, list of cluster IDs specifying the
+     *  path of route reflectors though which this route has traversed.
+     *  Optional (by default, no cluster list is advertised) */
+    repeated BgpAttrib32 cluster_list   = 15;
+
+    /** BGP Cluster ID is a unsigned 32-bit BGP Identifier value,
+     *  as per RFC 6286, encoded in network byte order. Cluster ID is
+     *  append to the cluster_list for advertisement with reflected routes.
+     *  Optional (by default, no cluster ID is advertised) */
+    BgpAttrib32 cluster_id              = 16;
+
+    /**
+     *  Flag indicating the route operations defined in RouteOperation enum
+     *  These values can be ORed to indicate a combination of operations.
+     *  USE OF THIS FIELD IS DEPRECATED. Instead, use route_flags.
+     */
+    uint32 route_oper_flag                = 17 [deprecated=true];
+
+    /** Protocol next-hop(s) for the route. If multiple next-hops are given,
+     *  the route will be treated as a BGP multipath for load balancing.
+     *  NOTE: Multipath is not currently supported by the API and
+     *  an error will be returned when adding/changing a route with more than
+     *  one next-hop. REQUIRED */
+    repeated jnxBase.IpAddress protocol_nexthops = 18;
+
+    /** BGP Peer type for this route. Optional (default INTERNAL) */
+    BgpPeerType route_type                       = 19;
+
+    /**
+     * Flags for routes. These flags are generally non-mutually exclusive
+     * states.
+     * Optional (default is no flags).
+     */
+     BgpRouteOperationFlags route_flags          = 20;
+
+    /**
+     * Address family specific route data.
+     * Mandatory for address family for which it is defined (e.g. SRTE).
+     */
+     AddressFamilySpecificData route_data        = 21;
+
+    /**
+     * BGP Path Attribute known as the Tunnel Encapsulation attribute.
+     * Contain information that is used to form the encapsulation header
+     * for one of the specified tunnel type.
+     * Optional (by default, no tunnel_attributes are advertised)
+     */
+    TunnelEncapAttribute tunnel_attributes       = 22;
+}
+
+/**
+ * A monitoring entry for a single BGP route streamed from BGP when the
+ * client has registered for route monitoring with BgpRouteMonitorRegister().
+ */
+message BgpRouteMonitorEntry {
+
+    /** The route operation types for the monitor entries */
+    enum BgpRouteMonitorOper {
+
+        /**
+         *  A new route is being added or modified.
+	 *  bgp_route will contain the route info.
+         */
+        ROUTE_UPDATE  = 0;
+
+	/**
+         *  An existing route is being removed.
+	 *  bgp_route will contain the route info.
+         */
+        ROUTE_REMOVE  = 1;
+
+	/**
+         *  The initial set of route monitoring entires following a fresh
+	 *  client registration has been completed. bgp_route will be null for
+         *  this operation.
+         */
+	END_OF_RIBS   = 2;
+    }
+
+    /** The operation type */
+    BgpRouteMonitorOper operation = 1;
+
+    /**
+     *  The route that is the subject of this route monitoring operation.
+     *  If the operation is END_OF_RIBS, then no route will be
+     *  present here.
+     */
+    BgpRouteEntry bgp_route             = 2;
+}
+
+
+// ----------------------------------------------------------------
+// BGP route operations service
+//
+
+/**
+ * Request to initialize the BGP route service. No parameters are needed.
+ */
+message BgpRouteInitializeRequest {
+}
+
+/**
+ * BGP route service initialize reply containing the status of the operation.
+ * Replies indicate to the client whether any old routing state was
+ * recovered and rebound to this connection.
+ */
+message BgpRouteInitializeReply {
+
+    /* Possible return codes for route service initialize operations. */
+    enum BgpRouteInitializeStatus {
+
+        /** Request successfully completed. Note that no preexisting
+         *  state for old clients with the same name was rebound. */
+        SUCCESS                = 0;
+
+        /** Request successfully completed AND preexisting routing state
+         *  for an old client connection of the same name has been recovered
+         *  and bound to this client connection. */
+        SUCCESS_STATE_REBOUND  = 1;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR         = 2;
+
+        /** Failed due to previous initialization operation. */
+        ALREADY_INITIALIZED    = 3;
+
+        /** Failed to find or create a gateway */
+        GATEWAY_INVALID        = 4;
+
+        /** Previous clean up work is pending try again later */
+        CLEANUP_PENDING        = 5;
+
+	/** The BGP protocol is not configured and initialized */
+	BGP_NOT_READY           = 6;
+
+    }
+
+    /** The final return code for the request. */
+    BgpRouteInitializeStatus status = 1;
+
+    /** Valid only when status is CLEANUP_PENDING and will indicate the number
+     * of routes on the gateway, giving an idea of the time required to cleanup */
+    uint32 gw_n_routes = 2;
+}
+
+/**
+ * Request to reset the BGP route service.
+ * Any routes that were added by the client will be removed during the
+ * cleanup of the client's state. No parameters are needed.
+ */
+message BgpRouteCleanupRequest {
+}
+
+/**
+ * Route service cleanup reply containing the status of the operation.
+ */
+message BgpRouteCleanupReply {
+
+    /** Possible return codes for route service cleanup operations. */
+    enum BgpRouteCleanupStatus {
+
+        /** Request successfully completed. */
+        SUCCESS         = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR  = 1;
+
+        /** Request failed because there was no initialized state to
+	 *  cleanup. */
+        NOT_INITIALIZED = 2;
+    }
+
+    /** The final return code for the request. */
+    BgpRouteCleanupStatus status = 1;
+}
+
+/**
+ * Route add, modify, or update operation request parameters.
+ */
+message BgpRouteUpdateRequest {
+
+    /** One or more programmed bgp routes to add, udpate, or modify.
+     *  REQUIRED */
+    repeated BgpRouteEntry bgp_routes = 1;
+}
+
+/**
+ * Route remove operation request parameters.
+ */
+message BgpRouteRemoveRequest {
+
+    /** If or_longer is FALSE only routes for the exact destination
+     *  prefix and prefix length will be matched.
+     *  If or_longer is TRUE, routes for the given destination prefix
+     *  or longer prefixes will be matched.
+     *  Optional (default is FALSE) */
+    bool or_longer                      = 1;
+
+    /** One or more programmed bgp routes to remove. REQUIRED */
+    repeated BgpRouteMatch bgp_routes = 2;
+}
+
+/**
+ * Route get operation request parameters.
+ */
+message BgpRouteGetRequest {
+
+    /** Route matching parameters */
+    BgpRouteMatch bgp_route                     = 1;
+
+    /** If or_longer is FALSE only routes for the exact destination
+     *  prefix and prefix length will be matched.
+     *  If or_longer is TRUE, routes for the given destination prefix
+     *  or longer prefixes will be matched.
+     *  Optional (default is FALSE) */
+    bool or_longer                               = 2;
+
+    /** If active_only is TRUE, inactive and hidden routes for a matching
+     *  prefix will be omitted from the results. If FALSE, inactive
+     *  and hidden routes are also returned. Optional (default is FALSE) */
+    bool active_only                             = 3;
+
+    /** The format for IP addresses in the replies to this request.
+     *  Optional (default is string) */
+    jnxBase.AddressFormat reply_address_format   = 4;
+
+    /** The format for IP addresses in the replies to this request.
+     *  Optional (default is string) */
+    RouteTableFormat reply_table_format          = 5;
+
+    /** The maximum number of routes requested in each reply.
+     *  Replies will be streamed in multiple RPCs each having no more
+     *  routes than given by this value. Counts from 1 through the maximum of
+     *  1000 may be specified. A value of zero indcates that
+     *  the server will choose an appropriate. Optional (default 1) */
+    uint32 route_count                           = 6;
+}
+
+
+/**
+ * Route operation reply containing the status of the operation.
+ * Replies always returns the final status (either success or the first error
+ * encountered) and the number of routes that were successfully processed
+ * prior to any error or full completion of the request.
+ */
+message BgpRouteOperReply {
+
+    /** Possible return codes for route add/modify/update/remove operations. */
+    enum BgpRouteOperStatus {
+
+        /** Request successfully completed in full. */
+        SUCCESS                 = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR          = 1;
+
+	/** The bgp route service has not been initialized */
+	NOT_INITIALIZED         = 2;
+
+	/** Request did not result in any operations */
+	NO_OP                   = 3;
+
+	/** Request contained too many operations */
+	TOO_MANY_OPS            = 4;
+
+	/** Request contained an invalid table. */
+	TABLE_INVALID           = 5;
+
+	/** Request contained a table that was not ready for operations. */
+	TABLE_NOT_READY         = 6;
+
+	/** Request contained an invalid destination address prefix */
+	PREFIX_INVALID          = 7;
+
+	/** Request contained a destination prefix length too short for the
+ 	 *  supplied address/NLRI. */
+	PREFIX_LEN_TOO_SHORT    = 8;
+
+	/** Request contained a destination prefix length too long for the
+ 	 *  supplied address/NLRI. */
+	PREFIX_LEN_TOO_LONG     = 9;
+
+	/** The server did not have a valid gateway associated with the
+         *  client. */
+	GATEWAY_INVALID         = 10;
+
+	/** Request contained an invalid nexthop. */
+	NEXTHOP_INVALID         = 11;
+
+	/** Request contained a nexthop with an invalild address. */
+	NEXTHOP_ADDRESS_INVALID = 12;
+
+	/** Request to add paths exceeding maximum ECMP paths for a
+	 *  destination. */
+        NEXTHOP_ECMP_LIMIT      = 13;
+
+	/** Request contained an invalid community. */
+	COMMUNITY_LIST_INVALID  = 14;
+
+	/** Request contained an invalid AS path. */
+	ASPATH_INVALID          = 15;
+
+	/** Request contained a invalid label information. */
+	LABEL_INFO_INVALID      = 16;
+
+	/** Request contains a route that is already present in the table. */
+	ROUTE_EXISTS            = 17;
+
+	/** Request contains a route that is NOT present in the table. */
+	ROUTE_NOT_FOUND         = 18;
+
+	/** Request contains an invalid cluster list. */
+	CLUSTER_LIST_INVALID    = 19;
+
+	/** Request contains an invalid protocol. Only PROTO_UNSPECIFID
+	 *  or PROTO_BGP_STATIC are allowed in route change operations.
+         */
+	PROTOCOL_INVALID        = 20;
+
+	/** Request contains a route that is NOT present in the table. */
+	ROUTE_ADD_FAILED        = 21;
+
+	/** The BGP protocol is not initialized and ready to accept
+	 *  route change operations. */
+	BGP_NOT_READY           = 22;
+
+	/** Request cannot be serviced until current requests are processed. */
+	TRY_AGAIN               = 23;
+
+	/** Request contains a parameter that is not currently supported. */
+	REQUEST_UNSUPPORTED     = 24;
+
+	/** Request contained an invalid BGP peer type. */
+	PEER_TYPE_INVALID          = 25;
+
+        /** SR-TE Segment Lists is invalid, like zero segment list */
+        SEGMENT_LIST_INVALID       = 26;
+
+        /** SR-TE Segment is invalid, like zero segment list */
+        SEGMENT_INVALID            = 27;
+
+        /** SR-TE Segment label is invalid; reserved label or label ttl > 255 */
+        SEGMENT_LABEL_INVALID         = 28;
+
+        /** SR-TE Segment ID is invalid like segment type is not set */
+        SEGMENT_ID_INVALID         = 29;
+
+        /** Number of SR-TE Segment Lists exceeded limit (8) */
+        SEGMENT_LIST_COUNT_INVALID = 30;
+
+        /** Number of SR-TE Segments exceeded limit (5) */
+        SEGMENT_COUNT_INVALID     = 31;
+
+        /** SRTE Route Data is not set. */
+        SRTE_ROUTE_DATA_INVALID     = 32;
+
+        /** Flow spec address field is invalid. */
+        FLOWSPEC_ADDR_INVALID     = 33;
+
+        /** Flow spec match fields invalid or no match field is specified */
+        FLOWSPEC_MTCH_FLDS_INVALID = 34;
+
+        /** Flow spec prefix contains invalid action or no action specified */
+        FLOWSPEC_ACTION_INVALID   = 35;
+
+        /** Flow spec prefix matches an existing flow-spec route added by CLI. */
+         FLOWSPEC_STATIC_RT_EXISTS   = 36;
+
+        /** SRTE Priority value is invalid. Valid values are [1,255] */
+        SRTE_PRIORITY_INVALID        = 37;
+
+        /** Request contained an invalid tunnel list */
+        TUNNEL_ATTR_LIST_INVALID  = 38;
+
+        /** Tunnel attribute's egress endpoint is not a valid unicast or ipv4 address */
+        TUNNEL_ATTR_EGRESS_ENDPOINT_NOT_IPV4  = 39;
+
+        /** Tunnel attribute's color does not match color of community */
+        TUNNEL_ATTR_COLOR_COM_COLOR_MISMATCH  = 40;
+
+        /** Tunnel attribute's Endpoint must match NH if encap community is set to IPIP*/
+        TUNNEL_ATTR_ENDPOINT_NH_MISMATCH  = 41;
+
+        /** SRTE ENLP value is invalid. Valid values are 1-4. */
+        SRTE_ENLP_INVALID        = 42;
+
+        /**
+        * Request has mutually exclusive route-flags set
+        * use_nexthop_reject and use_nexthop_fictitious flags are mutually exclusive.
+        */
+        MUTUALLY_EXCLUSIVE_RT_FLAGS_ARE_SET = 43;
+}
+
+    /** The final return code for the request. */
+    BgpRouteOperStatus status   = 1;
+
+    /** The number of requested operations for which the operation
+      * completed successfully. Note that in the case of remove
+      * operations with or_longer=TRUE or cookie=0, this is not the number of
+      * routes matched and removed.
+      */
+    uint32 operations_completed = 2;
+}
+
+/**
+ * Route get reply containing the status of the operation and the full or
+ * partial set of matching routes, depending on how many reply RPCs the
+ * stream of routes is split among.
+ */
+message BgpRouteGetReply {
+
+    /** Possible return codes for route get operations. */
+    enum BgpRouteGetStatus {
+
+        /** Request successfully completed in full. */
+        SUCCESS              = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR       = 1;
+
+        /** Request failed because there was no initialized state to
+         *  cleanup. */
+        NOT_INITIALIZED      = 2;
+
+	/** Request contained an invalid table. */
+	TABLE_INVALID        = 3;
+
+        /** Request contained a table that was not ready for operations. */
+	TABLE_NOT_READY      = 4;
+
+        /** Request contained an invalid destination address prefix */
+	PREFIX_INVALID       = 5;
+
+	/** Request contained a destination prefix length too short for the
+	 *  supplied address/NLRI. */
+	PREFIX_LEN_TOO_SHORT = 6;
+
+	/** Request contained a destination prefix length too long for the
+ 	 *  supplied address/NLRI. */
+	PREFIX_LEN_TOO_LONG  = 7;
+
+	/** Request contained a route that does not match
+	 *  destinations in the routing table. */
+	ROUTE_NOT_FOUND      = 8;
+
+	/** Request specified an invalid protocol to match */
+	PROTOCOL_INVALID     = 9;
+
+	/** Request does not contain valid route match parameters */
+	ROUTE_INVALID        = 10;
+
+	/** Request contains a parameter that is not currently supported. */
+	REQUEST_UNSUPPORTED  = 11;
+
+	/** Request cannot be serviced until current requests are processed. */
+	TRY_AGAIN               = 12;
+
+        /** Request contains a route_count that exceeds the max of 1000 */
+        ROUTE_COUNT_INVALID  = 13;
+
+	/** Request contained an invalid community. */
+	COMMUNITY_LIST_INVALID  = 14;
+
+	/** Flow spec address field is invalid. */
+	FLOWSPEC_ADDR_INVALID     = 15;
+
+	/** Flow spec match fields invalid or no match field is specified */
+	FLOWSPEC_MTCH_FLDS_INVALID = 16;
+
+	/** Flow spec prefix contains invalid action or no action specified */
+	FLOWSPEC_ACTION_INVALID   = 17;
+    }
+
+    /** The final return code for the request. */
+    BgpRouteGetStatus status            = 1;
+
+    /** One or more matching bgp routes. */
+    repeated BgpRouteEntry bgp_routes   = 2;
+}
+
+/**
+ * Route register operation request parameters. Registers the client
+ * for streaming route monitoring.
+ */
+message BgpRouteMonitorRegisterRequest {
+
+    /**
+     *  The format for IP addresses in the replies to this request.
+     *  Optional (default is string)
+     */
+    jnxBase.AddressFormat reply_address_format   = 1;
+
+    /**
+     *  The format for IP addresses in the replies to this request.
+     *  Optional (default is string)
+     */
+    RouteTableFormat reply_table_format          = 2;
+
+    /**
+     *  The maximum number of routes requested in each monitoring message.
+     *  Replies will be streamed in multiple RPCs each having no more
+     *  routes than given by this value. Counts from 1 through the maximum of
+     *  1000 may be specified. A value of zero indcates that
+     *  the server will choose an appropriate value. Optional (default 1)
+     */
+    uint32 route_count                           = 3;
+}
+
+/**
+ * The route registration reply is returned immediately upon initial
+ * registration for route monitoring via a call to BgpRouteMonitorRegister.
+ * Subsequently, monitoring entries are streamed via replies containing
+ * route information and status.
+ */
+message BgpRouteMonitorRegisterReply {
+
+    /** Possible return codes for route get operations. */
+    enum BgpRouteMonitorRegisterStatus {
+        /** Request successfully completed in full. */
+        SUCCESS                = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR         = 1;
+
+	/** The bgp route service has not been initialized */
+	NOT_INITIALIZED        = 2;
+
+	/** Too many clients or BMP stations are already registered. */
+	REGISTRATIONS_EXCEEDED = 3;
+
+	/** Client is already registered. */
+	ALREADY_REGISTERED     = 4;
+
+        /** Request contains a route_count that exceeds the max of 1000 */
+        ROUTE_COUNT_INVALID    = 5;
+
+        /** Request contains invalid address format. */
+        ADDRESS_FORMAT_INVALID = 6;
+
+        /** Request contains invalid table format. */
+        TABLE_FORMAT_INVALID   = 7;
+    }
+
+    /** The return code for the registration operation. */
+    BgpRouteMonitorRegisterStatus status            = 1;
+
+    /**
+     *  A set of monitoring entries for individual routes or
+     *  the end-of-ribs indication.
+     */
+    repeated BgpRouteMonitorEntry monitor_entries   = 2;
+}
+
+/**
+ * Request to unregister the client from the BGP route monitoring.
+ * No parameters are needed.
+ */
+message BgpRouteMonitorUnregisterRequest {
+}
+
+/**
+ * The route unregistration reply confirms that the client has
+ * unregistered for route updates.
+ */
+message BgpRouteMonitorUnregisterReply {
+
+    /** Possible return codes for route unregister operation. */
+    enum BgpRouteMonitorUnregisterStatus {
+        /** Request successfully completed in full. */
+        SUCCESS         = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR  = 1;
+
+	/** The bgp route service has not been initialized */
+	NOT_INITIALIZED = 2;
+
+	/** Client is already registered. */
+	NOT_REGISTERED  = 3;
+    }
+
+    /* The return code for the unregiter operation. */
+    BgpRouteMonitorUnregisterStatus status = 1;
+}
+
+/**
+ * Request to refresh all route monitoring entries to the client.
+ * No parameters are needed.
+ */
+message BgpRouteMonitorRefreshRequest {
+}
+
+/**
+ * The route Refresh reply confirms that the client has
+ * triggered a refresh of route monitoring entries, which
+ * will be delivered followed by End-of-RIBs via the
+ * BgpRouteMonitorRegisterReply stream.
+ */
+message BgpRouteMonitorRefreshReply {
+
+    /** Possible return codes for route unregister operation. */
+    enum BgpRouteMonitorRefreshStatus {
+        /** Request successfully completed in full. */
+        SUCCESS         = 0;
+
+        /** Request failed due to an internal server error. */
+        INTERNAL_ERROR  = 1;
+
+	/** The bgp route service has not been initialized */
+	NOT_INITIALIZED = 2;
+
+	/** Client is already registered. */
+	NOT_REGISTERED  = 3;
+    }
+
+    /* The return code for the refresh operation. */
+    BgpRouteMonitorRefreshStatus status = 1;
+}
+
+/**
+ * BGP route operations service
+ */
+service BgpRoute {
+
+    /** BGP Routing Initialize operation
+     *  BgpRouteInitialize() must be called upon connection or reconnection
+     *  to the server. If the client is connecting for the first time, the
+     *  server will initialize per-client state for the connection.
+     *  If the client is reconnecting with the same client name following a
+     *  connection fault (having not closed a previous connection with
+     *  BgpRouteCleanup), then gateway and route state will be rebound to
+     *  the new connection.
+     *  In this case, the return status will indicate that state was rebound
+     *  and the client need not reply the previous routing state to the
+     *  server.
+     */
+    rpc BgpRouteInitialize (BgpRouteInitializeRequest)
+        returns (BgpRouteInitializeReply) {}
+
+    /** BGP Routing Cleanup operation
+     *  BgpRouteCleanup will purge all gateway and route state for the
+     *  client.
+     */
+    rpc BgpRouteCleanup (BgpRouteCleanupRequest)
+        returns (BgpRouteCleanupReply) {}
+
+    /** BGP Route Add operation
+     *  Add a BGP-Static route to the routing table.
+     *  bgp_route_add may be called multiple times for the same prefix to add
+     *  multiple paths with distinct path_cookie for the same destination.
+     *  If a matching route already exists in the given table, then an error
+     *  will be returned.
+     *  BgpRouteUpdateRequest may contain from one to 1000 routes
+     *  to be added.
+     *  If the request contains multiple routes, the routes will
+     *  be processed in the order given and the first error encountered will
+     *  cause the request to abort.
+     *  The API always returns the final status (success or first error
+     *  encountered) and the number of routes that were successfully created
+     *  prior to any error or full completion of the request.
+     */
+    rpc BgpRouteAdd (BgpRouteUpdateRequest)
+        returns (BgpRouteOperReply) {}
+
+    /** BGP Route Modify operation
+     * Modify an existing BGP-Static route in the routing table. For each
+     * route in the request, if the route_key is matched, the matched route
+     * will be updated with the supplied route attributes.
+     * If a matching route does not exist in the given table, then an error
+     * will be returned.
+     * BgpRouteUpdateRequest may contain from one to 1000 routes
+     * to be added.
+     * If the request contains multiple routes, the routes will
+     * be processed in the order given and the first error encountered will
+     * cause the request to abort.
+     * The API always returns the final status (success or first error
+     * encountered) and the number of routes that were successfully modified
+     * prior to any error or full completion of the request.
+     */
+    rpc BgpRouteModify (BgpRouteUpdateRequest)
+        returns (BgpRouteOperReply) {}
+
+    /** BGP Route Update operation
+     *  Create a new BGP-Static route if a matching route does not exist, OR
+     *  modify an existing BGP-Static route if it is already present in the
+     *  routing table.
+     *  BgpRouteUpdateRequest may contain from one to 1000 routes
+     *  to be added.
+     *  If the request contains multiple routes, the routes will
+     *  be processed in the order given and the first error encountered will
+     *  cause the request to abort.
+     *  The API always returns the final status (success or first error
+     *  encountered) and the number of routes that were successfully modified
+     *  prior to any error or full completion of the request.
+     */
+    rpc BgpRouteUpdate (BgpRouteUpdateRequest)
+        returns (BgpRouteOperReply) {}
+
+    /** BGP Route Remove operation
+    *  Remove a BGP-Static route from the routing table.
+    *  BgpRouteRemove may be called multiple times for the same prefix
+    *  to remove multiple paths with distinct path_cookie for the same
+    *  destination.
+    *  The request may contain from one to 1000 routes
+    *  to be removed.
+    *  If the request contains multiple routes, the routes will
+    *  be processed in the order given and the first error encountered will
+    *  cause the request to abort.
+    *  The API always returns the final status (success or first error
+    *  encountered) and the number of routes that were successfully modified
+    *  prior to any error or full completion of the request.
+    */
+    rpc BgpRouteRemove (BgpRouteRemoveRequest)
+        returns (BgpRouteOperReply) {}
+
+    /** BGP Route Get operation
+     *  Lookup a BGP or BGP-Static protocol route from the routing table.
+     *  All match parameters are optional.
+     *  Match fields that are not specified or that
+     *  may match more than one route (e.g. a less-specific destination
+     *  prefix) may result in multiple routes being returned in the replies.
+     *  Only BGP and BGP-Static routes will be matched.
+     *  Replies are streamed until all match routes have been sent. The
+     *  client will receive a final null message once all routes have
+     *  been received.
+     *  The server's walk of search results is not atomic so route changes
+     *  during streaming and consumption of replies may or may not be
+     *  reflected in the results.
+     *  See BgpRouteGetReply.
+     */
+    rpc BgpRouteGet (BgpRouteGetRequest)
+        returns (stream BgpRouteGetReply) {}
+
+    /**
+     *  BGP Route Monitoring Registration
+     *  Register to receive updates streamed from BGP when routes matching
+     *  the bgp-import "analyze" policy action are added, modified, or
+     *  withdrawn by BGP peers.
+     *  Updates will be streamed as BgpRouteMonitorRegisterReply mesages
+     *  BgpRouteMonitorUnregister() is called.
+     *  Upon initial registration, a full download of route ADD operations for
+     *  all routes matching the "analyze" import policy action will be
+     *  streamed, followed by a closing END_OF_RIB operation. Subsequently,
+     *  incremental updates will be streamed whenever BGP advertisements
+     *  from peers are added, modified, or withdrawn, or when BGP import
+     *  "analyze" policy is changed.
+     *  There is no strict ordering of routes in the update stream and
+     *  state compression is applied when applicable to a set of operations.
+     */
+    rpc BgpRouteMonitorRegister (BgpRouteMonitorRegisterRequest)
+        returns (stream BgpRouteMonitorRegisterReply) {}
+
+    /**
+     * BGP Route Monitoring Unregistration
+     * Generated client API: BgpRouteMonitorUnregister()
+     * Unregister to receive updates streamed from BGP when routes are
+     * added, modified, or withdrawn by BGP peers.
+     */
+    rpc BgpRouteMonitorUnregister (BgpRouteMonitorUnregisterRequest)
+        returns (BgpRouteMonitorUnregisterReply) {}
+
+    /**
+     * BGP Route Monitoring Refresh
+     * Generated client API: BgpRouteMonitorRefresh()
+      * Request to refresh all route monitoring entries to the client.
+     */
+    rpc BgpRouteMonitorRefresh (BgpRouteMonitorRefreshRequest)
+        returns (BgpRouteMonitorRefreshReply) {}
+}
