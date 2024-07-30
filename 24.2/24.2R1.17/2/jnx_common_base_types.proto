@@ -1,0 +1,88 @@
+//
+// Copyright 2018, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: JET Common Package
+package jnx.jet.common;
+
+import "google/protobuf/descriptor.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.1.0";
+
+option (jnx.jet.common.junos_release) = "18.4";
+
+// [brief]: Junos API version string to provide semantic versioning support
+// [detail]: Junos API version string. This string follows the semver
+// format (https://semver.org/).
+extend google.protobuf.FileOptions {
+    // [brief]: Junos API version string
+    string japi_version = 50000;
+    // [brief]: Junos release string of format XY.Z
+    string junos_release = 50001;
+}
+
+// [brief]: Global status codes to be returned in response messages.
+// [detail]: Global status codes to be returned in response messages.
+// Per-RPC specific status/error codes are to be conveyed
+// in sub-codes defined in respective API definitions.
+// [default]: SUCCESS
+enum StatusCode {
+    // [brief]: Indicates that the RPC executed without error
+    SUCCESS = 0;
+    // [brief]: Indicates a failure condition that should be treated as fatal
+    FAILURE = 1;
+}
+
+// [brief]: Message representing timeval structure
+// [detail]: Message representing timeval structure
+message TimeVal {
+    // [brief]: Seconds from timeval structure
+    uint64 seconds      = 1;
+    // [brief]: Microseconds from timeval structure
+    uint64 microseconds = 2;
+}
+
+// [brief]: RPC execution status information
+// [detail]: RPC execution status information
+message RpcStatus {
+    // [brief]: Numerical code indicating success or failure of an RPC
+    StatusCode code    = 1;
+
+    // [brief]: Informational message string to convey reason for RPC failure
+    string     message = 2;
+}
+
+// [brief]: Numeric ranges can be used to provide range of unsigned 32-bit values.
+// [detail]: Numeric ranges can be used to provide range of unsigned 32-bit values.
+message NumericRange {
+    //[brief]: Range Minimum value (inclusive).
+    //[mandatory]:
+    uint32 min = 1;
+
+    //[brief]: Range Maximum value (inclusive).
+    //[mandatory]:
+    uint32 max = 2;
+}
+
+// [brief]: List of Numeric Range.
+// [detail]: List of Numeric Range.
+message NumericRangeList {
+    // [brief]: Range List for enums.
+    // OPTIONAL
+    repeated NumericRange range_list = 1;
+}
