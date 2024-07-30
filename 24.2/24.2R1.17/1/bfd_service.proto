@@ -1,0 +1,423 @@
+/**
+ * Copyright (C) 2019. Juniper Networks, Inc.
+ * protobuf/gRPC definitions for BFD service
+ * Vinay K Nallamothu <nvinay@juniper.net>
+ */
+
+syntax = "proto3";
+
+import "prpd_common.proto";
+
+package bfd;
+
+service BFD {
+    /**
+     *  Must be invoked before invoking any other BFD service APIs.
+     */
+    rpc Initialize (InitializeRequest)	returns (InitializeResponse);
+
+    /**
+     * Add a new BFD session.
+     */
+    rpc	SessionAdd (SessionRequest)	returns (SessionOperationResponse);
+
+    /**
+     * Modify an existing BFD session.
+     */
+    rpc SessionUpdate (SessionRequest)  returns (SessionOperationResponse);
+
+    /**
+     * Delete an existing BFD session.
+     */
+    rpc SessionDelete (SessionRequest) returns (SessionOperationResponse);
+
+    /**
+     * Deletes all BFD sessions owned by this client. Useful to cleanup
+     * after a disconnect and reconnect to reset the state.
+     */
+    rpc	SessionDeleteAll (DeleteAllRequest)  returns (SessionOperationResponse);
+
+    /**
+     * Subscribe for BFD session event notifications.
+     */
+    rpc Subscribe (SubscribeRequest) returns (stream EventResponse);
+
+    /**
+     * UnSubscribe for BFD session event notifications.
+     */
+    rpc Unsubscribe (UnsubscribeRequest) returns (UnsubscribeResponse);
+}
+
+/**
+ * BFD session details
+ */
+message SessionRequest {
+    /**
+     * Key is considered to be immutable once a session is added.
+     * Required.
+     */
+    SessionKey		key	    = 1;
+
+    /**
+     * Tunable session paramaters which can be updated via SessionUpdate.
+     * Required for SessionAdd and SessionUpdate.
+     */
+    SessionParameters	params	    = 2;
+
+    /**
+     * Specifies the BFD signaling type to be used.
+     * default: CLASSICAL.
+     */
+    SessionType		type	    = 3;
+
+    /**
+     * Specifies whether the BFD session is single/multi-hop.
+     * default: AUTOMATIC.
+     */
+    SessionMode		mode	    = 4;
+
+    /**
+     * Specifies the BFD control-plane signaling type.
+     */
+    enum SessionType {
+	/**
+	 * Classical BFD: BFD signals the remote-end and learns the
+	 * remote-discriminator before setting up liveness
+	 * check probes.
+	 * IPv4 and IPv6 are supported. MPLS is not supported.
+	 */
+	CLASSICAL    = 0;
+
+	/**
+	 * Use seamless BFD RFC 7880 to setup BFD sessions which is
+	 * quicker to setup.
+	 * Client has to provide the remote discriminator which the
+	 * remote end has to configure as local-discriminator.
+	 * IPv4 and MPLS are supported. IPv6 is currently not supported.
+	 */
+	SEAMLESS    = 1;
+
+	/**
+	 * Use BFD echo mode without control-plane signaling. BFD detects
+	 * liveness by having the packets routed back to itself and doesnt
+	 * require BFD support at remote end. Multi-HOP sessions assume
+	 * MPLS reachability to remote end.
+	 */
+	ECHO_LITE   = 2;
+
+	/**
+	 * Use BFD ECHO mode with asynchronous control-plane signaling.
+	 * Multi-HOP sessions require MPLS reachability.
+	 */
+	ECHO	     = 3;
+    }
+
+    /**
+     * Specifies whether the session is single/multi-hop.
+     */
+    enum SessionMode {
+	/**
+	 * session mode will be autodetected based on the destination address.
+	 */
+	AUTOMATIC   = 0;
+
+	SINGLE_HOP  = 1;
+	MULTI_HOP   = 2;
+    }
+}
+
+/**
+ * BFD session parameters which are immutable for a given session. Can't be
+ * modified or updated by client once a session is created using session-id.
+ */
+message SessionKey {
+    /**
+     * Session id is assigned by the BFD service on receiving a Session Add
+     * request. Session-id must be 0 Session Add requests. Response includes
+     * session_id. Subsequent operations can use session_id as the key.
+     * For Session Update and Delete requests, session-id is used as the key.
+     */
+    uint32		   session_id		= 1;
+
+    /**
+     * Optionally specify the local-address to be used.
+     * Usually this is required by multihop BFD session, but in some
+     * scenarios this can be derived based on the nexthop address
+     * or the outgoing interface.
+     * optional for self-ping sessions.
+     */
+    routing.NetworkAddress local_address	= 2;
+
+    /**
+     * Specifies the remote address.
+     * This field is mandatory but can be set flexiblely
+     * for SELF-PING sessions
+     */
+    routing.NetworkAddress remote_address	= 3;
+
+    /**
+     * Optional field.
+     * This is required only when routing has to be bypassed.
+     */
+    string		   interface_name	= 4;
+
+    /**
+     * Optional field.
+     * NULL for default instance.
+     */
+    string		   instance_name	= 5;
+
+    /**
+     * local-discriminator is unique per BFD session and is assigned by the router.
+     * must be 0 for ADD request. This field is mainly for future GET requests which
+     * will fetch the local-discriminator and fill here.
+     */
+    uint32		   local_discriminator  = 6;
+
+    /**
+     * This field is optional for classical and self-ping sessions, but is mandatory
+     * for seamless BFD sessions.
+     * It can be same as remote IP address.
+     */
+    uint32		   remote_discriminator = 7;
+
+    /**
+     * Holds the tunnel info (label stack and nexthop address) for MPLS tunnels.
+     */
+    TunnelAttributes	   tunnel_info		= 8;
+
+    /**
+     * Set by the client. JUNOS doesn't interpret it.
+     */
+    uint64		   cookie		= 9;
+}
+
+/**
+ * Holds the tunnel info for MPLS tunnels.
+ */
+message TunnelAttributes {
+    /**
+     * Label stack: inner-most first, top-label last
+     * Number of labels: minimum 1, maximum 16.
+     * Required.
+     */
+    repeated routing.LabelEntry	labels		= 1;
+    /**
+     * Nexthop IP address.
+     * Required for self-ping.
+     * For mpls seamless, label nexthop will be used
+     * if this field is not specified.
+     */
+    routing.NetworkAddress	nexthop_address	= 2;
+}
+
+/**
+ * Tunable BFD session parameters
+ */
+message SessionParameters {
+    /**
+     * Represents the minimum interval (in milliseconds) at which the local
+     * BFD service transmits hello packets to the BFD peer.
+     * Value range: 1-255,000.
+     * Optional, default value is 1000.
+     */
+    uint32	    minimum_tx_interval = 1;
+
+    /**
+     * Number of hello packets not received from a BFD peer that causes the
+     * session to be declared down.
+     * Value range: 1-255.
+     * Optional, default value is 3.
+     */
+    uint32	    multiplier	     = 2;
+
+    /**
+     * Authentication for BFD session.
+     * Optional.
+     */
+    Authentication  authentication   = 3;
+
+    /**
+     * Represents the minimum receive interval (in milliseconds) at which the local
+     * BFD service expects hello packets from the BFD peer with a BFD session is
+     * established.
+     * Value range: 1-255,000.
+     * Optional, default value is 1000.
+     */
+    uint32	    minimum_rx_interval = 4;
+
+    /**
+     * Represents the minimum interval (in milliseconds) for BFD echo mode at
+     * which the local BFD service transmits control-plane liveness packets to
+     * the BFD peer. Doesn't apply to classic and seamless BFD mode.
+     * Value range: 1-255,000.
+     * Optional, default value is 1000.
+     */
+    uint32	    minimum_echo_tx_interval = 5;
+
+    /**
+     * Represents the minimum interval (in milliseconds) for BFD echo mode at which
+     * the local routing device expects to receive BFD control-plane packets
+     * from a neighbor with which it has established a BFD session.
+     * Doesn't apply to classic and seamless BFD mode.
+     *
+     * This attribute is currently not supported.
+     *
+     * Value range: 1-255,000.
+     * Optional, default value is 1000.
+     */
+    uint32	    minimum_echo_rx_interval = 6;
+}
+
+/**
+ * Specify the authentication parameters to setup BFD session.
+ */
+message Authentication {
+    AuthenticationType	type	    = 1;
+
+    /**
+     * Keychain refers to the name of the keychain configured via the CLI
+     * Name of the security keychain to associate security key with the BFD
+     * session. The keychain name must match one of the keychains configured
+     * in the authentication-key-chains key-chain statement at the
+     * [edit security] hierarchy level.
+     * Optional.
+     */
+    string		keychain    = 2;
+
+    /**
+     * When loose checking is configured, packets are accepted without
+     * authentication being checked at each end of the session. Loose
+     * authentication is useful for transitional periods when authentication
+     * might not be configured at both ends of the BFD session.
+     * Optional, default is false.
+     */
+    bool		loose_check = 3;
+
+    /**
+     * Specifies the algorithm used to authenticate the given BFD session
+     * default is none.
+     */
+    enum AuthenticationType {
+	NONE			= 0;
+	PLAIN_TEXT_PASSWORD	= 1;
+	KEYED_MD5		= 2;
+	METICULOUS_KEYED_MD5    = 3;
+	KEYED_SHA1		= 4;
+	METICULOUS_KEYED_SHA1   = 5;
+    }
+}
+
+/**
+ * BFD session state
+ */
+enum SessionState {
+    UNKNOWN	= 0;
+    UP		= 1;
+    DOWN	= 2;
+    ADMIN_DOWN	= 3;
+    DESTROYED	= 4;
+}
+
+/**
+ * Response message of Subscribe Request.
+ * Notify client about any state changes of programmed BFD sessions.
+ */
+message EventResponse {
+    /**
+     * Type of event.
+     * For now the only type is session state change.
+     */
+    EventType	    type	    = 1;
+
+    /**
+     * Identifier of the BFD session.
+     */
+    uint32	    session_id	    = 2;
+
+    /**
+     * The new state after a BFD session state change.
+     */
+    SessionState    session_state   = 3;
+
+    enum EventType {
+	RESERVED	   = 0;
+	SESSION_STATE	   = 1;
+    }
+
+    /**
+     * Return code and error message for Subscribe Request.
+     */
+    routing.RpcStatus	    status          = 4;
+    StatusCode	    sub_code        = 5;
+}
+
+enum StatusCode {
+    /**
+     * Request successfully completed in full.
+     */
+    SUCCESS                 =  0;
+
+    FAILURE		    =  1;
+
+    /**
+     * Request failed due to an internal server error.
+     */
+    INTERNAL_ERROR          =  2;
+
+    /**
+     * The route service has not been initialized
+     */
+    NOT_INITIALIZED         =  3;
+
+    INVALID_SESSION_ID	    =  4;
+    INVALID_SESSION_KEY	    =  5;
+    INVALID_SESSION_TYPE    =  6;
+    INVALID_SESSION_MODE    =  7;
+    INVALID_TUNNEL	    =  8;
+    INVALID_AUTH_KEY	    =  9;
+    INVALID_AUTH_TYPE	    = 10;
+    ALREADY_SUBSCRIBED      = 11;
+    NOT_SUBSCRIBED          = 12;
+    NOT_SUPPORTED	    = 13;
+    NEXTHOP_UNREACHABLE     = 14;
+}
+
+message SessionOperationResponse {
+    uint32      session_id	= 1;
+    uint64	cookie		= 2;
+
+    /**
+     * Return code and error message for any Session Operation.
+     */
+    routing.RpcStatus	status		= 3;
+    StatusCode	sub_code	= 4;
+}
+
+message SubscribeRequest {
+}
+
+message InitializeRequest {
+}
+
+message InitializeResponse {
+    /**
+     * Return code and error message for Initialize Request.
+     */
+    routing.RpcStatus   status          = 1;
+    StatusCode  sub_code        = 2;
+}
+
+message DeleteAllRequest {
+}
+
+message UnsubscribeRequest {
+}
+
+message UnsubscribeResponse {
+    /**
+     * Return code and error message for Initialize Request.
+     */
+    routing.RpcStatus   status      = 1;
+    StatusCode          sub_code    = 2;
+}
