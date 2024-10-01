@@ -1,0 +1,93 @@
+//
+// Copyright 2022, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: This package gives support for paragon active assurance container
+// system utilities.
+package jnx.jet.container.paa;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [brief]: Paragon active assurance system utility service.
+// [detail]: JET RPC service providing paragon active assurance container system
+// utility. Paragon active assurance test agents running in container can pull
+// information, such as transmit statistics for bandwidth allocated for that
+// container.
+service Paa {
+
+    // [brief]: Transmit statistics get operation.
+    // [detail]: Transmit statistics get RPC returns transmit statistics for
+    // paragon active assurance container.
+    rpc TransmitStatisticsGet(TransmitStatisticsGetRequest)
+        returns (TransmitStatisticsGetResponse);
+}
+
+// [brief]: Transmit statistics get request message.
+// [detail]: Empty request message for getting transmit statistics for paragon
+// active assurance container.
+message TransmitStatisticsGetRequest {
+}
+
+// [brief]: Transmit statistics get response message.
+// [detail]: Response to transmit statistics get request operation which
+// contains the status of processed request, and transmit statistics for paragon
+// active assurance container if the request has been processed successfully.
+message TransmitStatisticsGetResponse {
+
+    // [brief]: Possible status codes for transmit statistics get rpc operation.
+    // [default]: SUCCESS_COMPLETED
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED   = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR      = 1;
+    }
+
+    // [mandatory]:
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+
+    // [brief]: Transmit statistics for container.
+    // [detail]: Transmit statistics are valid if sub_code is SUCCESS_COMPLETED.
+    TransmitStatistics stats        = 3;
+}
+
+// [brief]: Transmit statistics.
+// [detail]: Paragon active assurance container transmit statistics.
+message TransmitStatistics {
+
+    // [mandatory]:
+    // [brief]: Bytes sent.
+    uint64 bytes     = 1;
+
+    // [mandatory]:
+    // [brief]: Packets sent.
+    uint64 pkts      = 2;
+
+    // [mandatory]:
+    // [brief]: Packets dropped.
+    // [detail]: Number of packets dropped by bandwidth policer for paragon
+    // active assurance container.
+    uint64 drop_pkts = 3;
+}

@@ -1,0 +1,128 @@
+//
+// Copyright 2020, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file provides RPCs for RPC/Service/Version Discovery.
+
+syntax = "proto3";
+
+package jnx.jet.version;
+
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "20.4";
+
+// [brief]: Junos Version Request Message
+// [detail]: Junos Version Request Message
+message JunosVersionRequest {
+}
+
+// [brief]: The Junos version reply
+// [detail]: The response containing Junos OS version
+message JunosVersionResponse {
+     // [brief]: Response status.
+     jnx.jet.common.RpcStatus status =1;
+     // [brief]: Junos version string.
+     // This will be like Junos: 20.3I20200422173451-EVO
+     string junos_version =2;
+     // [brief]: gRPC version string.
+     string grpc_version =3;
+     // [brief]: protobuf version.
+     string protobuf_version =4;
+}
+
+// [brief]: Message to list all the services
+// [detail]: Message to list all the services
+message ServiceListRequest {
+}
+
+
+// [brief]:  List of RPCs Available for given Service
+// [detail]: List of RPCs Available for given Service
+message ServiceListResponse {
+    // [brief]: Response status.
+    jnx.jet.common.RpcStatus status =1;
+    // [brief]: List of Services available
+    // format package::service
+    // example routing::Rib
+    repeated string  service_name =2;
+}
+
+// [brief]: The Service name to list all RPCs
+// [detail]: The Service name to list all RPCs
+message RpcListRequest {
+    // [brief]: Service name.
+    // should be in format package::service
+    string service_name =1;
+}
+
+// [brief]: The list of RPC
+// [detail]: The list of RPC for a given Service.
+message RpcListResponse {
+    // [brief]: Response status.
+    jnx.jet.common.RpcStatus status =1;
+    // [brief]: RPC name.
+    // example RouteGet
+    repeated string rpc_name =2;
+}
+
+// [brief]: The Service Version request
+// [detail]: The Service Version request for a given RPC.
+message ServiceVersionRequest {
+    // [brief]: RPC name to get service version
+    // should be package::service::rpc
+    //example routing::Rib::RouteGet
+    string rpc_name =1;
+}
+
+//[brief]: The Service version response
+// [detail]: The Service version response
+message ServiceVersionResponse {
+    // [brief]:Response status.
+    jnx.jet.common.RpcStatus status =1;
+    // [brief]:Major version of RPC.
+    uint32 major =2;
+    // [brief]:Minor version of RPC.
+    uint32 minor =3;
+    // [brief]:patch version of RPC.
+    uint32 patch =4;
+    // [brief]:tag of RPC
+    string tag =5;
+}
+
+
+//[brief]: The version discovery and RPC listing service
+//[detail]: The version discovery and RPC listing service
+service VersionDiscovery {
+    // [detail]: Get the Junos version
+    // [brief]: Get the Junos version
+    rpc JunosVersionGet(JunosVersionRequest) returns (JunosVersionResponse) {}
+
+    // [detail]: Get List of Services
+    // [brief]: Get List of Services
+    rpc ServiceListGet(ServiceListRequest) returns (ServiceListResponse) {}
+
+    // [detail]: Get List of all RPCs given a Service name
+    // [brief]: Get List of all RPCs given a Service name
+    rpc RpcListGet(RpcListRequest) returns (RpcListResponse) {}
+
+    // [detail]: Get the Service version of the given RPC.
+    // [brief]: Get the Service version of the given RPC.
+    rpc ServiceVersionGet(ServiceVersionRequest) returns (ServiceVersionResponse) {}
+}

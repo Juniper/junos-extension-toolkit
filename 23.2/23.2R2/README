@@ -1,0 +1,31 @@
+JET API IDL package
+===================
+
+Juniper Extension Toolkit (JET), an evolution of the Junos SDK, provides a
+modern, programmatic interface for developers of third-party applications on
+Junos devices. It focuses on providing a standards-based interface to JUNOS
+for customizing management and control plane functionality.
+
+JET uses gRPC ( http://www.grpc.io/ ) to enable request-response service across
+different languages and platforms. gRPC by default uses Protocol Buffers
+( https://developers.google.com/protocol-buffers/ ) as the Interface Definition
+Language (IDL) for describing service interface and structure of the messages.
+
+This package contains IDL(proto) files for various services supported in JUNOS.
+Protobuf compiler can be used to compile the IDL files provided in this package
+to generate client and server stubs in several languages.
+
+Example:-
+Python client stubs generation for Management IDL (jnx_management_service.proto)
+provided in this package, you can try the following command:
+"$ python -m grpc_tools.protoc -I./2 --python_out=. --grpc_python_out=.
+ 2/jnx_management_service.proto"
+More detailed documentation on different languages and options can be found in
+the above references links for gRPC and Protocol Buffers.
+
+Package content
+---------------
+Directory '1' contains legacy IDL files, these will be deprecated in future.
+
+Directory '2' contains new IDL files, moving forward please use these files
+for new JET App development activities.

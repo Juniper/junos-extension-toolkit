@@ -1,0 +1,3043 @@
+//
+//
+// Copyright 2018, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+
+
+// [detail]: This file defines the firewall package for JUNOS.
+//
+// Brief Description of the key concepts associated with this package and functionality is
+// as follows:
+//
+// Filter is a basic stateless forwarding construct to match on packet content
+// and take a set of actions if packet passes the matching criteria.
+//
+// A Filter is made up of a ordered set of terms, which defines how a packet is matched
+// against configured criteria and be treated.
+//
+// Each Term defines a set of packet matching criteria and a set of action to take
+// on the packet if the matching criteria is true. A packets needs to match ALL the matches in
+// an term to be considered a match.
+//
+// A Match is defined by an operation, packet field and value to be matched against. For details
+// on the operations supported and various packet fields that could be matched, refer the
+// corresponding Enum/Message structure below.
+//
+// An action determines what to do with the packet on meeting the matching criteria. There are two
+// types of actions, viz. terminating and non-terminating. Each term can have zero or more
+// non-terminating actions and zero or exactly one terminating action. A non-terminating action is
+// one that does not stop the packet to undergo the rest of the Filter processing. An terminating action
+// is one, that stops the packet to undergo any further Filter processing.
+//
+// An attachment point or a bind point is the point in path of packet processing where the packet is
+// subjected to Filter processing. An attachment point is defined by attachment entity and direction in
+// which the Filter is applied. For eg. a typical bind point is an interface where a packet is subjected
+// to Filter.
+//
+// Diagram below depicts an object diagram for a typical Filter.
+// Legends:
+//           Term-1 is the ordered Term at position 1.
+//           Term-n is the ordered Term at position n.
+//             M-n is the match number n in list of matching criteria in a given Term.
+//             A-n is the action number n in the list of actions for a given Term.
+//                    No no more than 1 action could be a terminating action.
+//
+//           +-------+-------+-----+------+
+// Filter -> | Term-1 | Term-2 | ... | Term-n|
+//           +-------+-------+-----+------+
+//            |
+//            |
+//            |      +-----+
+//            +----->| M-1 |
+//                   +-----+
+//                   | M-2 |
+//                   +-----+
+//                   | ... |
+//                   +-----+
+//                   | M-n |
+//                   +-----+
+//                      |
+//                      |           +-----+
+//                      +---------->| A-1 |
+//                                  +-----+
+//                                  | A-2 |
+//                                  +-----+
+//                                  | ... |
+//                                  +-----+
+//                                  | A-n |
+//                                  +-----+
+//
+//
+
+syntax = "proto3";
+
+package jnx.jet.firewall;
+
+// [version]: 0.0.0
+import "jnx_common_addr_types.proto";
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: New version of proto file "firewall service" for 19.2
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "19.2";
+
+// [brief]: Supported Match Operations
+// [default]: OP_INVALID
+enum MatchOperation {
+
+    // [brief]: Invalid Filter Match operation
+    OP_INVALID = 0;
+
+    // [brief]: Match operation equal
+    OP_EQUAL = 1;
+
+    // [brief]: Match operation not equal
+    OP_NOT_EQUAL = 2;
+}
+
+
+// [brief]: Policer types which can be configured.
+// [default]: POLICER_INVALID
+enum PolicerType {
+
+    // [brief]: Invalid policer type
+    POLICER_INVALID = 0;
+
+    // [brief]: Single rate two color
+    TWO_COLOR_POLICER = 1;
+
+    // [brief]: Singel rate three color
+    SINGLE_RATE_THREE_COLOR_POLICER = 2;
+
+    // [brief]: Two rate three color
+    TWO_RATE_THREE_COLOR_POLICER = 3;
+
+    // [brief]: Hierarchical
+    HIERARCHICAL_POLICER = 4;
+}
+
+
+// [brief]: Policer Flags to define scope of policer in Filter
+// [default]: POLICER_FLAG_INVALID
+enum PolicerFlag {
+
+    // [brief]: Invalid Flag
+    POLICER_FLAG_INVALID = 0;
+
+    // [brief]: The policer instance is activated for each Term its referenced.
+    POLICER_FLAG_TERM_SPECIFIC = 1;
+
+    // [brief]: The policer instance is activated at global Filter level.
+    POLICER_FLAG_FILTER_SPECIFIC = 2;
+}
+
+// [brief]: Color mode for SRTCM and TRTCM
+// [default]: COLOR_MODE_INVALID
+enum PolicerColorModeType {
+    // [brief]: Invalid type
+    COLOR_MODE_INVALID = 0;
+
+    // [brief]: Color Blind
+    COLOR_MODE_COLOR_BLIND = 1;
+
+    // [brief]: Color Aware
+    COLOR_MODE_COLOR_AWARE = 2;
+}
+
+// [brief]: Loss Priority values
+// [default]: LOSS_PRIORITY_INVALID
+enum FilterLossPriority {
+    // [brief]: Invalid
+    LOSS_PRIORITY_INVALID = 0;
+
+    // [brief]: High
+    LOSS_PRIORITY_HIGH = 1;
+
+    // [brief]: Medium High
+    LOSS_PRIORITY_MEDIUM_HIGH = 2;
+
+    // [brief]: Medium low
+    LOSS_PRIORITY_MEDIUM_LOW = 3;
+
+    // [brief]: low
+    LOSS_PRIORITY_LOW = 4;
+}
+
+// [brief]: Forwarding Class
+// [default]: FORWARDING_CLASS_INVALID
+enum FilterForwardingClass {
+
+    // [brief]: Invalid
+    FORWARDING_CLASS_INVALID = 0;
+
+    // [brief]: Assured
+    FORWARDING_CLASS_ASSURED = 1;
+
+    // [brief]: Best Effort
+    FORWARDING_CLASS_BEST_EFFORT = 2;
+
+    // [brief]: Expedited
+    FORWARDING_CLASS_EXPEDITED = 3;
+
+    // [brief]: Network Control
+    FORWARDING_CLASS_NETWORK_CONTROL = 4;
+}
+
+// [brief]: STP match Flags
+// [default]: STP_FLAG_INVALID
+enum FilterStpMatchFlags {
+
+    // [brief]: Invalid
+    STP_FLAG_INVALID = 0;
+
+    // [brief]: Blocking
+    STP_FLAG_BLOCKING = 1;
+
+    // [brief]: Forwarding
+    STP_FLAG_FORWARDING = 2;
+}
+
+// [brief]: Various Icmp Reject Action Reasons.
+// [default]: ICMP_ADMINISTRATIVELY_PROHIBITED
+enum ActionIcmpRejectReason {
+
+    // [brief]: Send ICMP Administratively Prohibited message
+    ICMP_ADMINISTRATIVELY_PROHIBITED = 0;
+
+    // [brief]: Send ICMP Bad Host ToS message
+    ICMP_BAD_HOST_TOS = 1;
+
+    // [brief]: Send ICMP Bad Network ToS message
+    ICMP_BAD_NETWORK_TOS = 2;
+
+    // [brief]: Send ICMP Fragmentation Needed message
+    ICMP_FRAGMENTATION_NEEDED = 3;
+
+    // [brief]: Send ICMP Host Prohibited message
+    ICMP_HOST_PROHIBITED = 4;
+
+    // [brief]: Send ICMP Host Unknown message
+    ICMP_HOST_UNKNOWN = 5;
+
+    // [brief]: Send ICMP Host Unreachable message
+    ICMP_HOST_UNREACHABLE = 6;
+
+    // [brief]: Send ICMP Network Prohibited message
+    ICMP_NETWORK_PROHIBITED = 7;
+
+    // [brief]: Send ICMP Network Unknown message
+    ICMP_NETWORK_UNKNOWN = 8;
+
+    // [brief]: Send ICMP Network Unreachable message
+    ICMP_NETWORK_UNREACHABLE = 9;
+
+    // [brief]: Send ICMP Port Unreachable message
+    ICMP_PORT_UNREACHABLE = 10;
+
+    // [brief]: Send ICMP Precedence Cutoff message
+    ICMP_PRECEDENCE_CUTOFF = 11;
+
+    // [brief]: Send ICMP Precedence Violation message
+    ICMP_PRECEDENCE_VIOLATION = 12;
+
+    // [brief]: Send ICMP Protocol Unreachable message
+    ICMP_PROTOCOL_UNREACHABLE = 13;
+
+    // [brief]: Send ICMP Source Host Isolated message
+    ICMP_SOURCE_HOST_ISOLATED = 14;
+
+    // [brief]: Send ICMP Source Route Failed message
+    ICMP_SOURCE_ROUTE_FAILED = 15;
+
+    // [brief]: Send TCP Reset message
+    ICMP_TCP_RESET = 16;
+}
+
+
+// [brief]: Various Icmp6 Reject Action Reasons.
+// [default]: ICMP6_ADMINISTRATIVELY_PROHIBITED
+enum ActionIcmp6RejectReason {
+
+    // [brief]: Send Administratively Prohibited message
+    ICMP6_ADMINISTRATIVELY_PROHIBITED = 0;
+
+    // [brief]: Send No route to destination message
+    ICMP6_NO_ROUTE_TO_DESTINATION = 1;
+
+    // [brief]: Send Beyond scope message
+    ICMP6_BEYOND_SCOPE = 2;
+
+    // [brief]: Send Address unreachable message
+    ICMP6_ADDRESS_UNREACHABLE = 3;
+
+    // [brief]: Send "Port unreachable" message
+    ICMP6_PORT_UNREACHABLE = 4;
+
+    // [brief]: Send "TTL is Zero during transit" message
+    ICMP6_TTL_EQUAL_TO_ZERO_DURING_TRANSIT = 5;
+
+    // [brief]: Send "TTL is Zero during reassembly" message
+    ICMP6_TTL_EQUAL_TO_ZERO_DURING_REASSEMBLY = 6;
+
+    // [brief]: Send "Ip6 header bad" message
+    ICMP6_IP6_HEADER_BAD = 7;
+
+    // [brief]: Send "Unrecognized option" message
+    ICMP6_UNRECOGNIZED_OPTION = 8;
+
+    // [brief]: Send "Unrecognized Next Header" message
+    ICMP6_UNRECOGNIZED_NEXT_HEADER = 9;
+
+    // [brief]: Send "Router renumbering command" message
+    ICMP6_ROUTER_RENUMBERING_COMMAND = 10;
+
+    // [brief]: Send "Router renumbering result" message
+    ICMP6_ROUTER_RENUMBERING_RESULT = 11;
+
+    // [brief]: Send "Sequence number reset" message
+    ICMP6_SEQUENCE_NUMBER_RESET = 12;
+}
+
+// [brief]: Fragment Flags
+// [default]: FRAGMENT_NONE
+enum FilterFragmentFlags {
+
+    // [brief]: None
+    FRAGMENT_NONE = 0;
+
+    // [brief]: Dont fragment flag
+    DONT_FRAGMENT = 1;
+
+    // [brief]: Is fragment flag
+    IS_FRAGMENT = 2;
+
+    // [brief]: First fragment flag
+    FIRST_FRAGMENT = 3;
+
+    // [brief]: More last fragment flag
+    LAST_FRAGMENT = 4;
+}
+
+// [brief]: Precedence
+// [default]: PRECEDENCE_ROUTINE
+enum FilterPrecedence {
+
+    // [brief]: Routine precedence
+    PRECEDENCE_ROUTINE = 0;
+
+    // [brief]: Priority precedence
+    PRECENCE_PRIORITY = 1;
+
+    // [brief]: Immediate precedence
+    PRECENCE_IMMEDIATE = 2;
+
+    // [brief]: Flash precedence
+    PRECENCE_FLASH = 3;
+
+    // [brief]: Flash override precedence
+    PRECENCE_FLASH_OVERRIDE = 4;
+
+    // [brief]: Critical ecp precedence
+    PRECENCE_CRITICAL_ECP = 5;
+
+    // [brief]: Internet control precedence
+    PRECENCE_INTERNET_CONTROL = 6;
+
+    // [brief]: Network control precedence
+    PRECENCE_NET_CONTROL = 7;
+}
+
+// [brief]: Filter Term operation
+// [default]: TERM_OPERATION_INVALID
+enum FilterTermOperation {
+
+    // [brief]: Invalid Term operation
+    TERM_OPERATION_INVALID = 0;
+
+    // [brief]: Can be used Add Term in Filter
+    TERM_OPERATION_ADD = 1;
+
+    // [brief]: Delete a existing term in given Filter.
+    TERM_OPERATION_DELETE = 2;
+
+    // [brief]: Replace an existing term. Must provide adjacency details to
+    // preserve the order of the term. Can be used with Change Filter API
+    TERM_OPERATION_REPLACE = 3;
+}
+
+// [brief]: Adjacency Type which determines the Term order in an Filter
+// [default]: ADJACENCY_AFTER
+enum FilterAdjacencyType {
+
+    // [brief]: Add next to the given term
+    TERM_AFTER = 0;
+
+    // [brief]: Add before the given term
+    TERM_BEFORE = 1;
+}
+
+// [brief]: Start offet used in match MatchFlexibleRange
+// [default]: FLEX_OFFSET_INVALID
+enum FilterTermMatchFlexStartOffest {
+
+    // [brief]: Invalid Flex match start offset
+    FLEX_OFFSET_INVALID = 0;
+
+    // [brief]: Layer-3 Flex match start offset
+    FLEX_OFFSET_LAYER_THREE = 1;
+
+    // [brief]: Layer-4 Flex match start offset
+    FLEX_OFFSET_LAYER_FOUR = 2;
+
+    // [brief]: Payload Flex match start offset
+    FLEX_OFFSET_PAYLOAD = 3;
+}
+
+// [brief]: Filter types.
+// [default]: TYPE_INVALID
+enum FilterTypes {
+
+    // [brief]: Invalid Filter type
+    TYPE_INVALID = 0;
+
+    // [brief]: Classic Filter type
+    TYPE_CLASSIC = 1;
+}
+
+// [brief]: Filter Families.
+// [default]: FAMILY_INVALID
+enum FilterFamilies {
+
+    // [brief]: Invalid
+    FAMILY_INVALID = 0;
+
+    // [brief]: IPv4 family
+    FAMILY_INET = 1;
+
+    // [brief]: IPv6 family
+    FAMILY_INET6 = 2;
+
+    // [brief]: Ethernet Switching family
+    FAMILY_ES = 3;
+
+    // [brief]: VPLS family
+    FAMILY_VPLS = 4;
+
+    // [brief]: MULTISERVICE family
+    FAMILY_MULTISERVICE = 5;
+
+    // [brief]: CCC family
+    FAMILY_CCC = 6;
+
+    // [brief]: MPLS family
+    FAMILY_MPLS = 7;
+}
+
+// [brief]: Any filter property flag to be enabled at the Filter level.
+// [default]: FLAGS_NONE
+enum FilterFlags {
+
+    // [brief]: None
+    FLAGS_NONE = 0;
+}
+
+// [brief]: Filter bind direction on bind object.
+// [detail]: Direction, input or output in which an Filter is bound.
+// Higher priority to the Filter bound as compared to cli configured filter if
+// exists.
+// The order of filters execution as shown below
+// In Input direction:
+// input_interface-> Client Filter -> CLI Filter -> route_lookup
+// In Output direction:
+// route_lookup -> CLI Filter -> Client Filter -> output_interface.
+// [default]: BIND_DIRECTION_INVALID
+enum FilterBindDirection {
+    // [brief]: Invalid bind direction
+    BIND_DIRECTION_INVALID = 0;
+
+    // [brief]: Bind on ingress before cli filter.
+    BIND_DIRECTION_INPUT = 1;
+
+    // [brief]: Bind on egress after cli filters.
+    BIND_DIRECTION_OUTPUT = 2;
+}
+
+// [brief]: Filter Bind object type
+// [default]: BIND_OBJ_TYPE_INVALID
+enum FilterBindObjType {
+
+    // [brief]: Invalid
+    BIND_OBJ_TYPE_INVALID = 0;
+
+    // [brief]: Interface
+    BIND_OBJ_TYPE_INTERFACE = 1;
+
+    // [brief]: Forwarding table
+    BIND_OBJ_TYPE_FWD_TABLE = 2;
+
+    // [brief]: Forwarding table
+    BIND_OBJ_TYPE_VLAN = 3;
+
+    // [brief]: Bridge domain
+    BIND_OBJ_TYPE_BRG_DOMAIN = 4;
+
+}
+
+
+// [brief]: Policer parameter for two color policer
+// [detail]: Policer parameter for two color policer
+message PolicerTwoColor {
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:12500000000]
+    uint64 bandwidth = 2;
+
+    // [brief]: Burst size, in bits per second
+    // [range]: [1500:100000000000]
+    uint64 burst_size = 4;
+
+    // [brief]: Loss priority
+    FilterLossPriority loss_priority = 5;
+
+    // [brief]: Forwarding class, user configured forwarding class name
+    string forwarding_class_name =  6;
+
+    // [brief]: Discard action
+    bool discard = 7;
+}
+
+// [brief]: Policer parameter for single rate three color policer
+// [detail]: Policer parameter for single rate three color policer
+message PolicerSingleRateThreeColor {
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:12500000000]
+    uint64 committed_rate = 2;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 committed_burst_size = 4;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 excess_burst_size = 5;
+
+    // [brief]: Discard action
+    bool discard = 7;
+
+    // [brief]: Color mode
+    PolicerColorModeType color_mode = 8;
+}
+
+
+// [brief]: Policer parameter for two rate three color policer
+// [detail]: Policer parameter for two rate three color policer
+message PolicerTwoRateThreeColor {
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:12500000000]
+    uint64 committed_rate = 2;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 committed_burst_size = 4;
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:12500000000]
+    uint64 excess_rate = 6;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 excess_burst_size = 8;
+
+    // [brief]: Discard action
+    bool discard = 9;
+
+    // [brief]: Color mode
+    PolicerColorModeType color_mode = 10;
+}
+
+
+// [brief]: Heirarchical Policer parameters
+// [detail]: Heirarchical Policer parameters
+message PolicerHierarchical {
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:125000000000]
+    uint64 aggregate_rate = 2;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 aggregate_burst_size = 4;
+
+    // [brief]: Bandwidth rate in bits per second
+    // [range]: [1000:125000000000]
+    uint64 premium_rate = 6;
+
+    // [brief]: Burst size in bits per second
+    // [range]: [1500:100000000000]
+    uint64 premium_burst_size = 8;
+
+    // [brief]: Discard action
+    bool discard = 9;
+}
+
+
+// [brief]: Policer Parameter
+// [detail]: Policer Parameter
+message PolicerParameter {
+    // [brief]: policer parameters of one of the policer type
+    oneof parameter {
+	// [brief]: Two color
+	PolicerTwoColor two_color_parameter = 1;
+
+	// [brief]: Three color
+	PolicerSingleRateThreeColor single_rate_tricolor_parameter = 2;
+
+	// [brief]: Three color
+	PolicerTwoRateThreeColor two_rate_tricolor_parameter = 3;
+
+	// [brief]: Hierarchcical
+	PolicerHierarchical hierarchical_parameter = 4;
+    }
+}
+
+
+// [brief]: Policer structure which is refered as action in Term
+// [detail]: Policer structure which is refered as action in Term
+message Policer {
+
+    // [brief]: Policer name
+    string name = 1;
+
+    // [brief]: Policer type
+    PolicerType type = 2;
+
+    // [brief]: Policer Flag
+    PolicerFlag flag = 3;
+
+    // [brief]: Policer Paremeter
+    PolicerParameter params = 4;
+}
+
+
+// [brief]: Input message used in PolicerAdd RPC
+// [detail]: Input message used in PolicerAdd RPC
+message PolicerAddRequest {
+
+    // [brief]: Policer name
+    string name = 1;
+
+    // [brief]: Policer type
+    PolicerType type = 2;
+
+    // [brief]: Policer Flag
+    PolicerFlag flag = 3;
+
+    // [brief]: Policer Paremeter
+    PolicerParameter params = 4;
+}
+
+
+// [brief]: Input message used in PolicerModify RPC
+// [detail]: Input message used in PolicerModify RPC to update or change any
+// policer parameters to the existing policer by policer name.
+message PolicerModifyRequest {
+
+    // [brief]: Policer name
+    string name = 1;
+
+    // [brief]: Policer type
+    PolicerType type = 2;
+
+    // [brief]: Policer Flag
+    PolicerFlag flag = 3;
+
+    // [brief]: Policer Paremeter
+    PolicerParameter params = 4;
+}
+
+
+// [brief]: Input message used in PolicerDelete to delete existing policer
+// [detail]: Input message used in PolicerDelete to delete existing policer
+// matching with only policer name
+message PolicerDeleteRequest {
+
+    // [brief]: Policer name
+    string name = 1;
+
+    // [brief]: Policer type
+    PolicerType type = 2;
+
+    // [brief]: Policer Flag
+    PolicerFlag flag = 3;
+}
+
+
+// [brief]: Filter match IP address
+// [detail]: Filter match IP address
+message MatchIpAddress {
+
+    // [brief]: address
+    jnx.jet.common.IpAddress addr = 1;
+
+    // [brief]: Prefix length range for IPv4 (0:32) or IPv6 (0:128) addresses
+    // [range]: [0:128]
+    uint32 prefix_length = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+
+// [brief]: Filter match Port
+// [detail]: Filter match Port, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchPort {
+
+    // [brief]: Minimum port value
+    // [range]: [0:65535]
+    uint32 min = 1;
+
+    // [brief]: Maximum port value
+    // [range]: [0:65535]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+
+// [brief]: Filter match Ip Precedence
+// [detail]: Filter match Ip Precedence, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchIpPrecedence {
+
+    // [brief]: Minimum precedence value
+    // [range]: [0:7]
+    FilterPrecedence min = 1;
+
+    // [brief]: Maximum precedence value
+    // [range]: [0:7]
+    FilterPrecedence  max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+
+}
+
+
+// [brief]: Filter match Traffic Class
+// [detail]: Filter match Traffic Class, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchTrafficClass {
+
+    // [brief]: Minimum Traffic Class value
+    // [range]: [0:63]
+    uint32 min = 1;
+
+    // [brief]: Maximum Traffic Class value
+    // [range]: [0:63]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Dscp Code
+// [detail]: Filter match Dscp Code, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchDscpCode {
+
+    // [brief]: Minimum Dscp code
+    // [range]: [0:63]
+    uint32 min = 1;
+
+    // [brief]: Maximum Dscp code
+    // [range]: [0:63]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+
+}
+
+// [brief]: Filter match protocol
+// [detail]: Filter match protocol, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchProtocol {
+
+    // [brief]: Minimum Protocol value
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum Protocol value
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Icmp Type
+// [detail]: Filter match Icmp Type, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchIcmpType {
+
+    // [brief]: Minimum Icmp type
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum Icmp type
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Icmp Code
+// [detail]: Filter match Icmp Code, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchIcmpCode {
+
+    // [brief]: Minimum Icmp code
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum Icmp code
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Packet Length
+// [detail]: Filter match Packet Length, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchPacketLength {
+
+    // [brief]: Minimum Packet length
+    // [range]: [0:65535]
+    uint32 min = 1;
+
+    // [brief]: Maximum Packet length
+    // [range]: [0:65535]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Loss Priority
+// [detail]: Filter match Loss Priority
+message MatchLossPriority {
+
+    // [brief]: Loss Priority match
+    FilterLossPriority priority = 1;
+
+    // [brief]: Match op
+    MatchOperation operation = 2;
+}
+
+// [brief]: Filter match Forwarding Class
+// [detail]: Filter match Forwarding Class
+message MatchForwardingClass {
+
+    // [brief]: Loss Priority match
+    FilterForwardingClass forwarding_class = 1;
+
+    // [brief]: Match op
+    MatchOperation operation = 2;
+}
+
+// [brief]: Filter match Next Header
+// [detail]: Filter match Next Header, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchNextHeader {
+
+    // [brief]: Minimum next header value
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum next header Value
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match MPLS Label
+// [detail]: Filter match MPLS Label, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchMplsLabel {
+
+    // [brief]: Minimum Label value
+    // [range]: [1:1048575]
+    uint32 min = 1;
+
+    // [brief]: Maximum Label Value
+    // [range]: [1:1048575]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Vlan Id
+// [detail]: Filter match Vlan Id, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchVlanId {
+
+    // [brief]: Minimum Vlan id
+    // [range]: [0:4095]
+    uint32 min = 1;
+
+    // [brief]: Maximum Vlan id
+    // [range]: [0:4095]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Mesh Group Id
+// [detail]: Filter match Mesh Group Id
+message MatchMeshGroup {
+
+    // [brief]: Mesh Group Id
+    // [range]: [0:127]
+    uint32 mesh_group_id = 1;
+
+    // [brief]: Match op
+    MatchOperation operation = 2;
+}
+
+// [brief]: Filter Match L2 Token
+// [detail]: Filter Match L2 Token
+message MatchL2Token {
+
+    // [brief]: L2 token value
+    // [range]: [0:524287]
+    uint32 token = 1;
+
+    // [brief]: Match op
+    MatchOperation operation = 2;
+}
+
+// [brief]: Filter match CFM Level
+// [detail]: Filter match CFM Level
+message MatchCfmLevel {
+
+    // [brief]:  CFM level
+    // [range]: [0:255]
+    uint32 cfm_level = 1;
+
+    // [brief]: Match op
+    MatchOperation operation = 2;
+}
+
+// [brief]: Filter match CFM Opcode
+// [detail]: Filter match CFM Opcode, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchCfmOpcode {
+
+    // [brief]: Minimum cfm opcode value
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum cfm opcode Value
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match TTL
+// [detail]: Filter match TTL Opcode, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchTtl {
+
+    // [brief]: Minimum Time to live
+    // [range]: [0:255]
+    uint32 min = 1;
+
+    // [brief]: Maximum Time to live
+    // [range]: [0:255]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Fragment offset
+// [detail]: Filter match Fragment offset, If min == max then match on exact value
+// always min should be less than or equal max.
+message MatchFragmentOffset {
+
+    // [brief]: Minimum Fragment offset
+    // [range]: [0:8191]
+    uint32 min = 1;
+
+    // [brief]: Maximum Fragment offset
+    // [range]: [0:8191]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter action Policer
+// [detail]: Filter action Policer referred with policer name and policer type.
+// Other parameters is unseen or ignored. Also ignored even if available policer parameters
+// provided as part of action mismatching with respect to Policer template.
+message ActionPolicer {
+
+    // [brief]: The policer
+    Policer policer = 1;
+}
+
+// [brief]: Filter action Counter
+// [detail]: Filter Action Counter
+message ActionCounter {
+
+    // [brief]: Counter name (upto 64 characters)
+    string counter_name = 1;
+
+}
+
+
+// [brief]: Filter action Send to Client
+// [detail]: Filter action Send to Client
+message ActionSendToClient {
+
+    // [brief]: Client name (upto 64 characters)
+    string client_name = 1;
+
+}
+
+// [brief]: Filter Action Copy to client
+// [detail]: Filter Action Copy to client
+message ActionCopyToHost {
+
+    // [brief]: Client name (upto 64 characters)
+    string client_name = 1;
+
+}
+
+// [brief]: Filter action Policer Instance
+// [detail]: Filter action Policer Instance is used to program new instance of
+// existing policer with instance specific policer flags.
+message ActionPolicerInstance {
+
+    // [brief]: The policer
+    Policer policer = 1;
+
+    // [brief]: Policer Instance name
+    string policer_instance = 2;
+}
+
+// [brief]: Filter action Topo Redirect
+// [detail]: Filter action Topo Redirect
+message ActionTopologyRedirect {
+
+    // [brief]: user configured routing-instance name, eg. ___private2__.inet.0
+    // [default]: by default points to default routing instance
+    string routing_instance_name = 1;
+
+    // [brief]: Topology name
+    string topology_name = 2;
+}
+
+// [brief]: Filter action set nexthop
+// [detail]: Filter action set nexthop
+message ActionSetNexthop {
+
+    // [brief]: Set nexthop index of 32 bit value
+    uint32 index = 1;
+}
+
+// [brief]: Filter action Loss Priority
+// [detail]: Filter action Loss Priority
+message ActionLossPriority {
+
+    // [brief]: Set loss priority
+    FilterLossPriority priority = 1;
+}
+
+// [brief]: Filter action Forwarding Priority
+// [detail]: Filter action Forwarding Priority
+message ActionForwardingPriority {
+
+    // [brief]: priority
+    // [range]: [0:255]
+    uint32 priority = 1;
+}
+
+// [brief]: Filter action Forwarding Class
+// [detail]: Filter action Forwarding Class
+message ActionForwardingClass {
+
+    // [brief]: set forwarding class id
+    FilterForwardingClass fc = 1;
+}
+
+// [brief]: Filter action Set IP DSCP
+// [detail]: Filter action Set IP DSCP
+message ActionSetIpDscp {
+
+    // [brief]: DSCP for IP and IPv6
+    // [range]: [0:63]
+    uint32 dscp = 1;
+}
+
+// [brief]: Interface format used in Filter actions
+// [detail]: Interface format, Interface unit Index or name in filter
+// action. eg. ge-0/0/1.0 or unit's index
+message ActionInterfaceUnit {
+
+    // [brief]: interface unit index or name
+    oneof interface {
+
+	// [brief]: Interface Unit Name
+	string unit_name = 1;
+
+	// [brief]: Interface unit Index
+	// [range]: [0:4095]
+	uint32 unit_index = 2;
+    }
+}
+
+// [brief]: Filter action next interface
+// [detail]: Filter action next interface, Interface unit Index or name in filter
+// action. eg. ge-0/0/1.0 or unit's index
+message ActionNextInterface {
+
+    // [brief]: user configured routing-instance name, eg. ___private2__.inet.0
+    // [default]: by default points to default routing instance
+    string routing_instance_name = 1;
+
+    // [brief]: interface unit index or name
+    ActionInterfaceUnit unit = 2;
+
+}
+
+// [brief]: Filter Action Next IP
+// [detail]: Filter Action Next IP
+message ActionNextIp {
+
+    // [brief]: user configured routing-instance name, eg. ___private2__.inet.0
+    // [default]: by default points to default routing instance
+    string routing_instance_name = 1;
+
+    // [brief]: address either ipv4 or ipv6
+    jnx.jet.common.IpAddress addr = 2;
+
+    // [brief]: Destination prefix length range for IPv4 (0:32) or IPv6 (0:128) addresses
+    // [range]: [0:128]
+    uint32 prefix_length = 3;
+
+}
+
+// [brief]: Filter Adjacency details of term placement
+// [detail]: Filter Adjacency details of term placement
+message FilterAdjacency {
+
+    // [brief]: Type of adjacency placement
+    FilterAdjacencyType type = 1;
+
+    // [brief]: The previous or the next AC
+    string term_name = 2;
+}
+
+// [brief]: Filter match on interface
+// [detail]: Filter match on interface unit Index or name e.g. ge-0/0/1.0 or unit's
+// index
+message MatchInterfaceUnit {
+
+    // [brief]: interface index or name
+    oneof interface {
+
+	// [brief]: Interface unit Name
+	string unit_name = 1;
+
+	// [brief]: Interface unit index
+	// [range]: [0:4095]
+	uint32 unit_index = 2;
+    }
+}
+
+// [brief]: Filter Flex Offset range match
+// [detail]: Flex Offset range match define with min and max values.
+// If min == max then match on exact value, always min should be
+// less than or equal max.
+// Flexible match min and max values range depends on bit length
+// configured in MatchFlexibleRange
+message MatchFlexOffset {
+
+    // [brief]: Depends on bit length of MatchFlexibleRange
+    // [range]: [1:4294967295]
+    uint32 min = 1;
+
+    // [brief]: Depends on bit length of MatchFlexibleRange
+    // [range]: [1:4294967295]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter Flex Match Range
+// [detail]: A flexible match with range of values can be defined by providing
+// start offset/position using reference of L3/L4 or payload and byte and bit
+// positing from the start offset. The range of values can be defined using bit
+// length field of MatchFlexibleRange
+message MatchFlexibleRange {
+
+    // [brief]: Flex match start offset
+    FilterTermMatchFlexStartOffest start_offset = 1;
+
+    // [brief]: Flex match bit length
+    // [range]: [1:32]
+    uint32 bit_length = 2;
+
+    // [brief]: Flex match bit offset
+    // [range]: [0:7]
+    uint32 bit_offset = 3;
+
+    // [brief]: Flex match byte offset
+    // [range]: [0:255]
+    uint32 byte_offset = 4;
+
+    // [brief]: Flex match range value
+    MatchFlexOffset range = 5;
+}
+
+// [brief]: Filter Flexible offset Range match
+// [detail]: Flexible offset range match as described in message
+// MatchFlexibleRange
+message MatchFlexibleOffsetRange {
+    // [brief]: Input configuration data in the relevant format.
+    oneof range {
+	// [brief]: Reference to flexible range match
+	MatchFlexibleRange flex_range_match = 1;
+    }
+}
+
+
+// [brief]: Filter match fleaxible Mask.
+// [detail]: A flexible match with mask can be defined by providing start
+// offset/position using reference of L3/L4 or payload and byte and bit positing
+// from the start offset. The prefix in string format can be matched with the
+// mask value provided. Mask value will be dependent on bit length of field of
+// MatchFlexibleMask
+message MatchFlexibleMask {
+
+    // [brief]: Flex match start offset
+    FilterTermMatchFlexStartOffest start_offset = 1;
+
+    // [brief]: Flex match bit length
+    // [range]: [1:32]
+    uint32 bit_length = 2;
+
+    // [brief]: Flex match bit offset
+    // [range]: [0:7]
+    uint32 bit_offset = 3;
+
+    // [brief]: Flex match byte offset
+    // [range]: [0:255]
+    uint32 byte_offset = 4;
+
+    // [brief]: Flex match mask of 32 bit
+    uint32 mask = 5;
+
+    // [brief]: 32 Bit, Flex prefix match encoded hex value as a string
+    // [pattern]: "0x89abcdef"
+    string prefix_string = 6;
+}
+
+
+// [brief]: Filter match flexible offset mask
+// [detail]: Flexible offset Mask match as described in message
+// MatchFlexibleMask
+message MatchFlexibleOffsetMask {
+    // [brief]: Input configuration data in the relevant format.
+    oneof mask {
+	// [brief]: Reference to Flexible mask parameters
+	MatchFlexibleMask flex_mask_match = 1;
+    }
+}
+
+// [brief]: Filter Match Mac address
+// [detail]: Filter Match Mac address
+message MatchMacAddress {
+
+    // [brief]: Mac address
+    jnx.jet.common.MacAddress addr = 1;
+
+    // [brief]: Mac address length
+    // [range]: [0:48]
+    uint32 addr_length = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+
+// [brief]: Filter match Ether Type. flexible to macth on full range of values
+// [detail]: Match on ether type. If min == max then match on exact value,
+// always min should be less than or equal max.
+message MatchEtherType {
+
+    // [brief]: Minimum Ether type, user can even use hex values for this field
+    // [range]: [0:65535]
+    uint32 min = 1;
+
+    // [brief]: Maximum Ether type, user can even use hex values for this field
+    // [range]: [0:65535]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter match Learn Vlan Id
+// [detail]: Match on Learn Vlan id. If min == max then match on exact value,
+// always min should be less than or equal max.
+message MatchLearnVlanId {
+
+    // [brief]: Minimum Learn vlan id
+    // [range]: [0:4095]
+    uint32 min = 1;
+
+    // [brief]: Maximum Learn vLan id
+    // [range]: [0:4095]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+
+// [brief]: Filter match learn vlan priority
+// [detail]: Match on Learn Vlan priority. If min == max then match on exact
+// value, always min should be less than or equal max.
+message MatchLearnVlanPriority {
+
+    // [brief]: Minimum Learn vlan priority
+    // [range]: [0:7]
+    uint32 min = 1;
+
+    // [brief]: Maximum Learn vLan priority
+    // [range]: [0:7]
+    uint32 max = 2;
+
+    // [brief]: Match op
+    MatchOperation operation = 3;
+}
+
+// [brief]: Filter Term list of Matches for Inet family Filter
+// [detail]: An Filter list of Matches supported by Inet family Filter
+message FilterTermMatchInet {
+
+    // [brief]: List of Destination addresses
+    repeated MatchIpAddress ipv4_dst_addrs = 1;
+
+    // [brief]: List of Source addresses
+    repeated MatchIpAddress ipv4_src_addrs = 2;
+
+    // [brief]: List of Destination ports
+    repeated MatchPort dst_ports = 3;
+
+    // [brief]: List of Source ports
+    repeated MatchPort src_ports = 4;
+
+    // [brief]: List of Dscp code points
+    repeated MatchDscpCode dscp_codes = 5;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol protocols = 6;
+
+    // [brief]: List of Icmp types
+    repeated MatchIcmpType icmp_types = 7;
+
+    // [brief]: List of Icmp codes
+    repeated MatchIcmpCode icmp_codes = 8;
+
+    // [brief]: List of Packet lengths
+    repeated MatchPacketLength packet_lengths = 9;
+
+    // [brief]: List of Ttl's
+    repeated MatchTtl ttls = 10;
+
+    // [brief]: Fragment flag
+    FilterFragmentFlags fragment_flag = 11;
+
+    // [brief]: List of fragment offset range
+    repeated MatchFragmentOffset frag_offsets = 12;
+
+    // [brief]: Interface unit (e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 13;
+
+    // [brief]: List of ip precedence
+    repeated MatchIpPrecedence ip_precedences = 14;
+
+    // [brief]: List of Addresses
+    repeated MatchIpAddress ipv4_addrs = 15;
+
+    // [brief]: List of Ports
+    repeated MatchPort ports = 16;
+
+    // [brief]: Flex Ranges
+    MatchFlexibleOffsetRange flex_range = 17;
+
+    // [brief]: Flex Masks
+    MatchFlexibleOffsetMask flex_mask = 18;
+}
+
+// [brief]: Inet family Inet terminating actions supported
+// [detail]: Inet family Inet terminating actions supported
+message FilterTermInetTerminatingAction {
+    // [brief]: Input configuration data in the relevant format.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Reject the matching packets
+	ActionIcmpRejectReason reject = 3;
+
+	// [brief]: user configured routing-instance name, eg. ___private2__.inet.0
+	// [default]: by default points to default routing instance
+	string routing_instance_name = 4;
+    }
+}
+
+// [brief]: Inet family Inet non-terminating actions supported
+// [detail]: Inet family Inet non-terminating actions supported
+message FilterTermInetNonTerminatingAction {
+
+	// [brief]: Count the matching packets
+	ActionCounter count = 1;
+
+	// [brief]: Log the matching packets
+	bool log = 2;
+
+	// [brief]: Syslog the matching packets
+	bool syslog = 3;
+
+	// [brief]: Policer action. Ensure that policer exists before it being used.
+	ActionPolicer policer = 4;
+
+	// [brief]: Sample
+	bool sample = 5;
+
+	// [brief]: Next Term
+	bool next_term = 6;
+}
+
+// [brief]: Filter Term Actions for Inet family Filter
+// [detail]: An Filter list of Actions supported by Inet family Filter
+message FilterTermInetAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermInetNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermInetTerminatingAction action_t = 2;
+}
+
+// [brief]: An Inet Filter Term
+// [detail]: An Inet Filter Term
+message FilterInetTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchInet matches = 4;
+
+    // [brief]: Actions
+    FilterTermInetAction actions = 5;
+}
+
+// [brief]: An Filter list of Matches for Ehthernet switching Family Filter
+// [detail]: An Filter list of Matches for Ehthernet switching Family Filter
+message FilterTermMatchEthernetSwitching {
+
+    // [brief]: List of Destination mac addresses
+    repeated MatchMacAddress dst_macs = 1;
+
+    // [brief]: List of Source mac addresses
+    repeated MatchMacAddress src_macs = 2;
+
+    // [brief]: List of Destination ports
+    repeated MatchPort dst_ports = 3;
+
+    // [brief]: List of Source ports
+    repeated MatchPort src_ports = 4;
+
+    // [brief]: List of Dscp code points
+    repeated MatchDscpCode dscp_codes = 5;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol protocols = 6;
+
+    // [brief]: List of Icmp types
+    repeated MatchIcmpType icmp_types = 7;
+
+    // [brief]: List of Icmp codes
+    repeated MatchIcmpCode icmp_codes = 8;
+
+    // [brief]: Interface unit (e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 9;
+
+    // [brief]: List of Ether type
+    repeated MatchEtherType ether_types = 10;
+
+    // [brief]: List of Learn vlan id
+    repeated MatchLearnVlanId learn_vlan_ids = 11;
+
+    // [brief]: List of learn vlan priority
+    repeated MatchLearnVlanPriority learn_vlan_priorities = 12;
+}
+
+// [brief]: Ethernet Switching family terminating actions supported
+// [detail]: Ethernet Switching family terminating actions supported
+message FilterTermEsTerminatingAction {
+    // [brief]: Input configuration data in the relevant format.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Next hop
+	ActionSetNexthop nh = 3;
+
+	// [brief]: Send to host
+	bool send_to_host = 4;
+    }
+}
+
+// [brief]: Ethernet Switching family non-terminating actions supported
+// [detail]: Ethernet Switching family non-terminating actions supported
+message FilterTermEsNonTerminatingAction {
+
+	// [brief]: Count the matching packets
+	ActionCounter count = 1;
+
+	// [brief]: Log the matching packets
+	bool log = 2;
+
+	// [brief]: Syslog the matching packets
+	bool syslog = 3;
+
+	// [brief]: Policer action. Ensure that policer exists before it being used.
+	ActionPolicer policer = 4;
+
+	// [brief]: Next Term
+	bool next_term = 5;
+
+	// [brief]: Loss priority
+	ActionLossPriority lp = 6;
+}
+
+// [brief]: Filter Term Actions for ES family Filter
+// [detail]: An Filter list of Actions supported by ES family Filter
+message FilterTermEsAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermEsNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermEsTerminatingAction action_t = 2;
+}
+
+// [brief]: An Ethernet Switching Filter Term
+// [detail]: An Ethernet Switching Filter Term
+message FilterEsTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchEthernetSwitching matches = 4;
+
+    // [brief]: Actions
+    FilterTermEsAction actions = 5;
+}
+
+// [brief]: An Filter list of Matches for Inet6 Family Filter
+// [detail]: An Filter list of Matches for Inet6 Family Filter
+message FilterTermMatchInet6 {
+    // [brief]: List of Destination addresses
+    repeated MatchIpAddress ipv6_dst_addrs = 1;
+
+    // [brief]: List of Source addresses
+    repeated MatchIpAddress ipv6_src_addrs = 2;
+
+    // [brief]: List of Destination ports
+    repeated MatchPort dst_ports = 3;
+
+    // [brief]: List of Source ports
+    repeated MatchPort src_ports = 4;
+
+    // [brief]: List of Dscp code points
+    repeated MatchDscpCode dscp_codes = 5;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol payload_protocols = 6;
+
+    // [brief]: List of Icmp types
+    repeated MatchIcmpType icmp_types = 7;
+
+    // [brief]: List of Icmp codes
+    repeated MatchIcmpCode icmp_codes = 8;
+
+    // [brief]: List of Packet lengths
+    repeated MatchPacketLength packet_lengths = 9;
+
+    // [brief]: Fragment flag
+    FilterFragmentFlags fragment_flag = 10;
+
+    // [brief]: Interface unit (e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 11;
+
+    // [brief]: List of traffic classes
+    repeated MatchTrafficClass traffic_classes = 12;
+
+    // [brief]: List of Addresses
+    repeated MatchIpAddress ipv6_addrs = 13;
+
+    // [brief]: Flex Ranges
+    MatchFlexibleOffsetRange flex_range = 14;
+
+    // [brief]: Flex Masks
+    MatchFlexibleOffsetMask flex_mask = 15;
+
+    // [brief]: List of Next Header match
+    repeated MatchNextHeader ipv6_next_headers = 16;
+
+    // [brief]: List of Loss Priority
+    repeated MatchLossPriority loss_priorities = 17;
+
+    // [brief]: List of Forwarding Class
+    repeated MatchForwardingClass forwarding_class = 18;
+
+    // [brief]: List of Ports
+    repeated MatchPort ports = 19;
+}
+
+// [brief]: inet6 family terminating actions supported
+// [detail]: Inet6 family terminating actions supported
+message FilterTermInet6TerminatingAction {
+    // [brief]: Config can allow only one terminating action.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Reject the matching packets
+	ActionIcmp6RejectReason reject = 3;
+
+	// [brief]: user configured routing-instance name, eg. ___private2__.inet.0
+	// [default]: by default points to default routing instance
+	string routing_instance_name = 4;
+
+	// [brief]: Direct matching packets to a routing instance
+	ActionTopologyRedirect topo_redirect = 5;
+
+	// [brief]: client name
+	ActionSendToClient send_to_client = 6;
+
+	// [brief]: Direct matching packets to host
+	bool send_to_host = 7;
+
+	// [brief]: set nexthop idx
+	ActionSetNexthop nh = 8;
+    }
+}
+
+// [brief]: inet6 family non-terminating actions supported
+// [detail]: Inet6 family non-terminating actions supported
+message FilterTermInet6NonTerminatingAction {
+
+    // [brief]: Count the matching packets
+    ActionCounter count = 1;
+
+    // [brief]: Log the matching packets
+    bool log = 2;
+
+    // [brief]: Syslog the matching packets
+    bool syslog = 3;
+
+    // [brief]: Policer action. Ensure that policer exists before it being used.
+    ActionPolicer policer = 4;
+
+    // [brief]: Sample
+    bool sample = 5;
+
+    // [brief]: Next Term
+    bool next_term = 6;
+
+    // [brief]: port mirror action
+    bool port_mirror = 7;
+
+    // [brief]: set loss priority to matched packets
+    ActionLossPriority loss_priority = 8;
+
+    // [brief]: set Forwarding class to matched packets
+    ActionForwardingClass forwarding_class = 9;
+
+    // [brief]: set Forwarding Priority to matched packets
+    ActionForwardingPriority forwarding_priority = 10;
+
+    // [brief]: set Next interface to matched packets
+    ActionNextInterface next_interface = 11;
+
+    // [brief]: set Next IPv4 to matched packets
+    ActionNextIp next_ip = 12;
+
+    // [brief]: set IP DSCP to matched packets
+    ActionSetIpDscp ip_dscp = 13;
+
+    // [brief]: Copy of matching packets to host
+    ActionCopyToHost copy_to_host = 14;
+
+    // [brief]: Policer instance. Ensure that policer exists before it being used.
+    ActionPolicerInstance policer_inst = 15;
+}
+
+// [brief]: Filter Term Actions for Inet6 family Filter
+// [detail]: An Filter list of Actions supported by Inet6 family Filter
+message FilterTermInet6Action {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermInet6NonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermInet6TerminatingAction action_t = 2;
+}
+
+// [brief]: An Filter list of Matches for Vpls Family Filter
+// [detail]: An Filter list of Matches for Vpls Family Filter
+message FilterTermMatchVpls {
+    // [brief]: List of Destination addresses (V4)
+    repeated MatchIpAddress ipv4_dst_addrs = 1;
+
+    // [brief]: List of Source addresses (V4)
+    repeated MatchIpAddress ipv4_src_addrs = 2;
+
+    // [brief]: List of Destination addresses (V6)
+    repeated MatchIpAddress ipv6_dst_addrs = 3;
+
+    // [brief]: List of Source addresses (V6)
+    repeated MatchIpAddress ipv6_src_addrs = 4;
+
+    // [brief]: List of Destination ports
+    repeated MatchPort dst_ports = 5;
+
+    // [brief]: List of Source ports
+    repeated MatchPort src_ports = 6;
+
+    // [brief]: List of Dscp code points
+    repeated MatchDscpCode dscp_codes = 7;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol ip_protocols = 8;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol payload_protocols = 9;
+
+    // [brief]: List of Icmp types
+    repeated MatchIcmpType icmp_types = 10;
+
+    // [brief]: List of Icmp codes
+    repeated MatchIcmpCode icmp_codes = 11;
+
+    // [brief]: Interface unit ( e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 12;
+
+    // [brief]: List of traffic classes
+    repeated MatchTrafficClass traffic_classes = 13;
+
+    // [brief]: List of Next Header match
+    repeated MatchNextHeader ipv6_next_headers = 14;
+
+    // [brief]: List of Ether type match
+    repeated MatchEtherType ether_types = 15;
+
+    // [brief]: List Source MAC match
+    repeated MatchMacAddress src_macs = 16;
+
+    // [brief]: List Destination MAC match
+    repeated MatchMacAddress dst_macs = 17;
+
+    // [brief]: List of Ether type match
+    repeated MatchEtherType vlan_ether_types = 18;
+
+    // [brief]: List of Vlan Id match
+    repeated MatchVlanId learn_vlan_ids = 19;
+
+    // [brief]: List of Vlan Id match
+    repeated MatchVlanId user_vlan_ids = 20;
+
+    // [brief]: List of Vlan Id match
+    repeated MatchLearnVlanPriority learn_vlan_priorities = 21;
+
+    // [brief]: STP state match
+    FilterStpMatchFlags stp_state = 22;
+
+    // [brief]: List of mesh group id match
+    repeated MatchMeshGroup mesh_group_ids = 23;
+
+    // [brief]: List of CFM Opcode match
+    repeated MatchCfmOpcode cfm_opcodes = 24;
+
+    // [brief]: List of CFM Level match
+    repeated MatchCfmLevel cfm_levels = 25;
+
+    // [brief]: List of L2 token match
+    repeated MatchL2Token l2_tokens = 26;
+
+    // [brief]: List of Ipv6 addresses (V6)
+    repeated MatchIpAddress ipv6_addrs = 27;
+
+    // [brief]: Flex Ranges
+    MatchFlexibleOffsetRange flex_range = 28;
+
+    // [brief]: Flex Masks
+    MatchFlexibleOffsetMask flex_mask = 29;
+
+    // [brief]: List of Packet lengths
+    repeated MatchPacketLength packet_lengths = 30;
+}
+
+// [brief]: Vpls family terminating actions supported
+// [detail]: Vpls family terminating actions supported
+message FilterTermVplsTerminatingAction {
+    // [brief]: Config can allow only one terminating action.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Direct matching packets to client
+	ActionSendToClient send_to_client = 3;
+
+	// [brief]: Direct matching packets to host
+	bool send_to_host = 4;
+
+	// [brief]: set nexthop idx
+	ActionSetNexthop nh = 5;
+    }
+}
+
+// [brief]: VPLS family non-terminating actions supported
+// [detail]: VPLS family non-terminating actions supported
+message FilterTermVplsNonTerminatingAction {
+
+    // [brief]: Count the matching packets
+    ActionCounter count = 1;
+
+    // [brief]: Log the matching packets
+    bool log = 2;
+
+    // [brief]: Syslog the matching packets
+    bool syslog = 3;
+
+    // [brief]: Policer action. Ensure that policer exists before it being used.
+    ActionPolicer policer = 4;
+
+    // [brief]: Sample
+    bool sample = 5;
+
+    // [brief]: Next Term
+    bool next_term = 6;
+
+    // [brief]: No Mac Learn
+    bool no_mac_learn = 7;
+
+    // [brief]: Copy of matching packets to host
+    ActionCopyToHost copy_to_host = 8;
+}
+
+// [brief]: Filter Term Actions for Vpls family Filter
+// [detail]: An Filter list of Actions supported by Vpls family Filter
+message FilterTermVplsAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermVplsNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermVplsTerminatingAction action_t = 2;
+}
+
+// [brief]: An Filter list of Matches for CCC Family Filter
+// [detail]: An Filter list of Matches for CCC Family Filter
+message FilterTermMatchCcc {
+
+    // [brief]: List of Packet lengths
+    repeated MatchPacketLength packet_lengths = 1;
+
+    // [brief]: Interface unit (e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 2;
+
+    // [brief]: List of Ether type match
+    repeated MatchEtherType ether_types = 3;
+
+    // [brief]: List Source MAC match
+    repeated MatchMacAddress src_macs = 4;
+
+    // [brief]: List Destination MAC match
+    repeated MatchMacAddress dst_macs = 5;
+
+    // [brief]: List of CFM Opcode match
+    repeated MatchCfmOpcode cfm_opcodes = 6;
+
+    // [brief]: List of CFM Level match
+    repeated MatchCfmLevel cfm_levels = 7;
+
+    // [brief]: Flex Ranges
+    MatchFlexibleOffsetRange flex_range = 8;
+
+    // [brief]: Flex Masks
+    MatchFlexibleOffsetMask flex_mask = 9;
+}
+
+// [brief]: CCC family terminating actions supported
+// [detail]: CCC family terminating actions supported
+message FilterTermCccTerminatingAction {
+    // [brief]: Config can allow only one terminating action.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Direct matching packets to client
+	ActionSendToClient send_to_client = 3;
+
+	// [brief]: Direct matching packets to host
+	bool send_to_host = 4;
+    }
+}
+
+// [brief]: CCC family non-terminating actions supported
+// [detail]: CCC family non-terminating actions supported
+message FilterTermCccNonTerminatingAction {
+
+    // [brief]: Count the matching packets
+    ActionCounter count = 1;
+
+    // [brief]: Log the matching packets
+    bool log = 2;
+
+    // [brief]: Syslog the matching packets
+    bool syslog = 3;
+
+    // [brief]: Policer action. Ensure that policer exists before it being used.
+    ActionPolicer policer = 4;
+
+    // [brief]: Sample
+    bool sample = 5;
+
+    // [brief]: Copy of matching packets to host
+    ActionCopyToHost copy_to_host = 6;
+}
+
+// [brief]: Filter Term Actions for CCC family Filter
+// [detail]: An Filter list of Actions supported by CCC family Filter
+message FilterTermCccAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermCccNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermCccTerminatingAction action_t = 2;
+}
+
+// [brief]: An Filter list of Matches for Multiservices Family Filter
+// [detail]: An Filter list of Matches for Multiservices Family Filter
+message FilterTermMatchMultiService {
+    // [brief]: List of Destination addresses (V4)
+    repeated MatchIpAddress ipv4_dst_addrs = 1;
+
+    // [brief]: List of Source addresses (V4)
+    repeated MatchIpAddress ipv4_src_addrs = 2;
+
+    // [brief]: List of addresses (V4)
+    repeated MatchIpAddress ipv4_addrs = 3;
+
+    // [brief]: List of Destination ports
+    repeated MatchPort dst_ports = 4;
+
+    // [brief]: List of Source ports
+    repeated MatchPort src_ports = 5;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol ip_protocols = 6;
+
+    // [brief]: List of Protocols
+    repeated MatchProtocol payload_protocols = 7;
+
+    // [brief]: List of Icmp types
+    repeated MatchIcmpType icmp_types = 8;
+
+    // [brief]: List of Icmp codes
+    repeated MatchIcmpCode icmp_codes = 9;
+
+    // [brief]: Interface unit (e.g. ge-0/0/1.0 or unit's index)
+    repeated MatchInterfaceUnit interface_units = 10;
+
+    // [brief]: List of Next Header match
+    repeated MatchNextHeader ipv6_next_headers = 11;
+
+    // [brief]: List of Ether type match
+    repeated MatchEtherType ether_types = 12;
+
+    // [brief]: List Source MAC match
+    repeated MatchMacAddress src_macs = 13;
+
+    // [brief]: List Destination MAC match
+    repeated MatchMacAddress dst_macs = 14;
+
+    // [brief]: List of Ether type match
+    repeated MatchEtherType vlan_ether_types = 15;
+
+    // [brief]: STP state match
+    FilterStpMatchFlags stp_state = 16;
+
+    // [brief]: List of mesh group id match
+    repeated MatchMeshGroup mesh_group_ids = 17;
+
+    // [brief]: List of L2 token match
+    repeated MatchL2Token l2_tokens = 18;
+
+    // [brief]: List of Packet lengths
+    repeated MatchPacketLength packet_lengths = 19;
+}
+
+// [brief]: Multiservices family terminating actions supported
+// [detail]: Multiservices family terminating actions supported
+message FilterTermMultiServiceTerminatingAction {
+    // [brief]: Config can allow only one terminating action.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+
+	// [brief]: Direct matching packets to client
+	ActionSendToClient send_to_client = 3;
+
+	// [brief]: Direct matching packets to host
+	bool send_to_host = 4;
+    }
+}
+
+// [brief]: Multiservices family non-terminating actions supported
+// [detail]: Multiservices family non-terminating actions supported
+message FilterTermMultiServiceNonTerminatingAction {
+
+    // [brief]: Count the matching packets
+    ActionCounter count = 1;
+
+    // [brief]: Log the matching packets
+    bool log = 2;
+
+    // [brief]: Syslog the matching packets
+    bool syslog = 3;
+
+    // [brief]: Policer Action. Ensure that policer exists before it being used.
+    ActionPolicer policer = 4;
+
+    // [brief]: Sample
+    bool sample = 5;
+
+    // [brief]: Next Term
+    bool next_term = 6;
+
+    // [brief]: Copy of matching packets to host
+    ActionCopyToHost copy_to_host = 7;
+}
+
+// [brief]: Filter Term Actions for Multiservices family Filter
+// [detail]: An Filter list of Actions supported by Multiservices family Filter
+message FilterTermMultiServiceAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermMultiServiceNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermMultiServiceTerminatingAction action_t = 2;
+}
+
+// [brief]: An Filter list of Matches for MPLS Family Filter
+// [detail]: An Filter list of Matches for MPLS Family Filter
+message FilterTermMatchMpls {
+    // [brief]: Label-1 match
+    repeated MatchMplsLabel labels1 = 1;
+
+    // [brief]: Label-2 match
+    repeated MatchMplsLabel labels2 = 2;
+
+    // [brief]: Label-3 match
+    repeated MatchMplsLabel labels3 = 3;
+
+    // [brief]: Flex Ranges
+    MatchFlexibleOffsetRange flex_range = 4;
+
+    // [brief]: Flex Masks
+    MatchFlexibleOffsetMask flex_mask = 5;
+}
+
+// [brief]: Mpls family terminating actions supported
+// [detail]: Mpls family terminating actions supported
+message FilterTermMplsTerminatingAction {
+    // [brief]: Config can allow only one terminating action.
+    oneof terminating_action {
+
+	// [brief]: Accept the matching packets
+	bool accept = 1;
+
+	// [brief]: Discard the matching packets
+	bool discard = 2;
+    }
+}
+
+// [brief]: Mpls family non-terminating actions supported
+// [detail]: Mpls family non-terminating actions supported
+message FilterTermMplsNonTerminatingAction {
+
+    // [brief]: Count the matching packets
+    ActionCounter count = 1;
+
+    // [brief]: Policer action. Ensure that policer exists before it being used.
+    ActionPolicer policer = 2;
+}
+
+// [brief]: Filter Term Actions for MPLS family Filter
+// [detail]: An Filter list of Actions supported by MPLS family Filter
+message FilterTermMplsAction {
+
+    // [brief]: List of non-terminating actions.
+    FilterTermMplsNonTerminatingAction actions_nt = 1;
+
+    // [brief]: One terminating action
+    FilterTermMplsTerminatingAction action_t = 2;
+}
+
+// [brief]: An Inet6 Filter Term
+// [detail]: An Inet6 Filter Term
+message FilterInet6Term {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchInet6 matches = 4;
+
+    // [brief]: Actions
+    FilterTermInet6Action actions = 5;
+}
+
+// [brief]: The VPLS Filter Term
+// [detail]: The VPLS Filter Term
+message FilterVplsTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchVpls matches = 4;
+
+    // [brief]: Actions
+    FilterTermVplsAction actions = 5;
+}
+
+// [brief]: The CCC Filter Term
+// [detail]: The CCC Filter Term
+message FilterCccTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchCcc matches = 4;
+
+    // [brief]: Actions
+    FilterTermCccAction actions = 5;
+}
+
+// [brief]: The MultiServices Filter Term
+// [detail]: The MultiServices Filter Term
+message FilterMultiServiceTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchMultiService matches = 4;
+
+    // [brief]: Actions
+    FilterTermMultiServiceAction actions = 5;
+}
+
+
+// [brief]: The MPLS Filter Term
+// [detail]: The MPLS Filter Term
+message FilterMplsTerm {
+
+    // [brief]: FilterTerm name
+    string term_name = 1;
+
+    // [brief]: FilterTerm operation
+    FilterTermOperation term_op = 2;
+
+    // [brief]: Adjacency
+    FilterAdjacency adjacency = 3;
+
+    // [brief]: Matches
+    FilterTermMatchMpls matches = 4;
+
+    // [brief]: Actions
+    FilterTermMplsAction actions = 5;
+}
+
+// [brief]: The top level Filter Term
+// [detail]: An Filter Term which holds any one of family specific Term as
+// part of Filter.
+message FilterTerm {
+    // [brief]: Config can allow only one family of Filter Terms in any Filter.
+    oneof filter_term {
+
+	// [brief]: For Inet family
+	FilterInetTerm inet_term = 1;
+
+	// [brief]: For Ethernet Switching family
+	FilterEsTerm es_term = 2;
+
+	// [brief]: For Inet6 family
+	FilterInet6Term inet6_term = 3;
+
+	// [brief]: For vpls family
+	FilterVplsTerm vpls_term = 4;
+
+	// [brief]: For ccc family
+	FilterCccTerm ccc_term = 5;
+
+	// [brief]: For multiservices family
+	FilterMultiServiceTerm mservice_term = 6;
+
+	// [brief]: For mpls family
+	FilterMplsTerm mpls_term = 7;
+
+    }
+}
+
+
+// [brief]: Filter
+// [detail]: Basic Filter structure to identify perticular Filter by name and
+// family.
+message Filter {
+
+    // [brief]: Filter name
+    string name = 1;
+
+    // [brief]: Filter family
+    FilterFamilies family = 2;
+}
+
+
+// [brief]: Filter Add message structure
+// [detail]: Filter detailed message input structure used in FilterAdd
+// rpc.
+message FilterAddRequest {
+
+    // [brief]: Filter name
+    string name = 1;
+
+    // [brief]: Filter type
+    FilterTypes type = 2;
+
+    // [brief]: Filter family
+    FilterFamilies family = 3;
+
+    // [brief]: Filter flag
+    FilterFlags flag = 4;
+
+    // [brief]: List of Destination addresses
+    repeated FilterTerm terms_list = 5;
+}
+
+
+// [brief]: Filter Modify message structure
+// [detail]: Filter detailed message input structure used in
+// FilterModify rpc.
+message FilterModifyRequest {
+
+    // [brief]: Filter name
+    string name = 1;
+
+    // [brief]: Filter type
+    FilterTypes type = 2;
+
+    // [brief]: Filter family
+    FilterFamilies family = 3;
+
+    // [brief]: Filter flag
+    FilterFlags flag = 4;
+
+    // [brief]: List of Filter Terms
+    repeated FilterTerm terms_list = 5;
+}
+
+// [brief]: Filter input structure used in FilterDelete rpc.
+// [detail]: Filter input structure used in FilterDelete rpc.
+message FilterDeleteRequest {
+
+    // [brief]: Filter name
+    string name = 1;
+
+    // [brief]: Filter family
+    FilterFamilies family = 2;
+}
+
+
+// [brief]: Input request messages for Filter counter get
+// [detail]: Input request messages for Filter counter by name and counter
+// name should be fully resolved.
+message FilterCounterGetRequest {
+
+     // [brief]: only Filter name
+     string filter_name = 1;
+
+     // [brief]: Counter name.
+     string counter_name = 2;
+}
+
+// [brief]: Input request messages for Filter policer counter get
+// [detail]: Input request messages for Filter policer counter by name and
+// counter name should be fully resolved.
+message PolicerCounterGetRequest {
+
+     // [brief]: only Filter name
+     string filter_name = 1;
+
+     // [brief]: Counter name.
+     string counter_name = 2;
+}
+
+// [brief]: Input request messages for Filter, policer counter clear
+// [detail]: Input request messages for Filter, policer counter clear by
+// counter name which should be fully resolved.
+message FilterCounterSetRequest {
+
+     // [brief]: only Filter name
+     string filter_name = 1;
+
+     // [brief]: Counter name.
+     string counter_name = 2;
+}
+
+// [brief]: Return/Response values for counter set Request RPC.
+// [detail]: Return/Response values for counter set Request RPC.
+message FilterCounterSetResponse {
+
+    // [brief]: Filter counter set response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+// [brief]: Input request messages for policer counter clear
+// [detail]: Input request messages for policer counter clear by
+// counter name which should be fully resolved.
+message PolicerCounterSetRequest {
+
+    // [brief]: only filter name
+    string filter_name = 1;
+
+    // [brief]: Counter name.
+    string counter_name = 2;
+}
+
+// [brief]: Return/Response values for policer counter set Request RPC.
+// [detail]: Return/Response values for policer counter set Request RPC.
+message PolicerCounterSetResponse {
+
+    // [brief]: Policer counter set response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+// [brief]: Return/Response values for Filter Add Request RPC.
+// [detail]: Return/Response values for Filter Add Request RPC.
+message FilterAddResponse {
+
+    // [brief]: Filter Add response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Filter Delete Request RPC.
+// [detail]: Return/Response values for Filter Delete Request RPC.
+message FilterDeleteResponse {
+
+    // [brief]: Filter Delete response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Filter Modify Request RPC.
+// [detail]: Return/Response values for Filter Modify Request RPC.
+message FilterModifyResponse {
+
+    // [brief]: Filter Modify response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Filter Bind Add Request RPC.
+// [detail]: Return/Response values for Filter Bind Add Request RPC.
+message FilterBindAddResponse {
+
+    // [brief]: Filter Bind Add response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Filter Bind Delete Request RPC.
+// [detail]: Return/Response values for Filter Bind Delete Request RPC.
+message FilterBindDeleteResponse {
+
+    // [brief]: Filter Bind delete response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Policer Add Request RPC.
+// [detail]: Return/Response values for Policer Add Request RPC.
+message PolicerAddResponse {
+
+    // [brief]: Policer Add response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Policer Delete Request RPC.
+// [detail]: Return/Response values for Policer Delete Request RPC.
+message PolicerDeleteResponse {
+
+    // [brief]: Policer Delete response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+
+// [brief]: Return/Response values for Policer Modify Request RPC.
+// [detail]: Return/Response values for Policer Modify Request RPC.
+message PolicerModifyResponse {
+
+    // [brief]: Policer Modify response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+// [brief]: Return/Response values for Filter counter get Request RPC.
+// [detail]: Return/Response values for Filter counter get Request RPC.
+message FilterCounterGetResponse {
+
+    // [brief]: Filter counter get response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+
+	// [brief]: Stats timeout
+	TIMEOUT = 5;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+
+    // [brief]: counter name
+    string counter_name = 3;
+
+    // [brief]: byte count
+    uint64 bytes = 4;
+
+    // [brief]: packet count
+    uint64 packets = 5;
+}
+
+// [brief]: Return/Response values for Filter Policer counter get Request RPC.
+// [detail]: Return/Response values for Filter Policer counter get Request RPC.
+message PolicerCounterGetResponse {
+
+    // [brief]: Filter policer counter get response internal status codes
+    // [default]: EOK
+    enum StatusCode {
+
+	// [brief]: Success
+	EOK = 0;
+
+	// [brief]: Wrong input
+	EINVALID_MESSAGE = 1;
+
+	// [brief]: Server Internal error
+	EINTERNAL = 2;
+
+	// [brief]: Operation not supported
+	EUNSUPPORTED_OP = 3;
+
+	// [brief]: Resource not available at server
+	NO_RESOURCE = 4;
+
+	// [brief]: Stats timeout
+	TIMEOUT = 5;
+    }
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+
+    // [brief]: counter name
+    string counter_name = 3;
+
+    // [brief]: byte count
+    uint64 bytes = 4;
+
+    // [brief]: packet count
+    uint64 packets = 5;
+}
+
+
+// [brief]: Filter Bind object Vlan
+// [detail]: Filter Bind object Vlan
+message FilterBindObjVlan {
+    // [brief]: Bind object VLAN name where the Filter is to be bound
+    string vlan_name = 1;
+
+    // [brief]: Bind object Routing Instance name of vlan  where the Filter is to be bound
+    string route_table = 2;
+}
+
+// [brief]: Filter Bind object BridgeDomain
+// [detail]: Filter Bind object BridgeDomain
+message FilterBindObjBridgeDomain {
+    // [brief]: Bind object bd name where the Filter is to be bound
+    string bridge_domain = 1;
+
+    // [brief]: Bind object Routing Instance name of bridge domain where the Filter is to be bound
+    string route_table = 2;
+}
+
+
+// [brief]: List of bind points where the Filter is to be bound
+// [detail]: List of bind points where the Filter is to be bound
+message FilterBindObjPoint {
+    // [brief]: List of bind points where the Filter is to be bound but only one at
+    // a time.
+    oneof bind_point {
+
+	// [brief]: Bind object, interface name where the Filter is to be bound
+	string interface_name = 1;
+
+	// [brief]: Bind object, forwarding table name where the Filter is to be bound
+	string forwarding_table = 2;
+
+	// [brief]: Bind object, vlan  where the Filter is to be bound
+	FilterBindObjVlan vlan = 3;
+
+	// [brief]: bind object, bridge domain where the Filter is to be bound
+	FilterBindObjBridgeDomain bridge_domain = 4;
+
+    }
+}
+
+
+// [brief]: Filter object bind add request
+// [detail]: Per forwarding element Filter binding. The order of filters execution
+// as shown below
+// In Input direction:
+// input_interface-> Client Filter -> CLI Filter -> route_lookup
+// In Output direction:
+// route_lookup -> CLI Filter -> Client Filter -> output_interface.
+message FilterObjBindAddRequest {
+
+    // [brief]: Filter
+    Filter filter = 1;
+
+    // [brief]: Binding object type
+    FilterBindObjType obj_type = 2;
+
+    // [brief]: Bind object name where the Filter is to be bound
+    FilterBindObjPoint bind_object = 3;
+
+    // [brief]: Bind direction
+    FilterBindDirection bind_direction = 4;
+
+    // [brief]: Family on the bind object. Must match with the Filter family
+    FilterFamilies bind_family = 5;
+}
+
+// [brief]: Filter unbind request per forwarding element
+// [detail]: Filter unbind request per forwarding element
+message FilterObjBindDeleteRequest {
+
+    // [brief]: Filter
+    Filter filter = 1;
+
+    // [brief]: Binding object type
+    FilterBindObjType obj_type = 2;
+
+    // [brief]: Bind object name where the Filter is to be bound
+    FilterBindObjPoint bind_object = 3;
+
+    // [brief]: Bind direction
+    FilterBindDirection bind_direction = 4;
+
+    // [brief]: Family on the bind object. Must match with the Filter family
+    FilterFamilies bind_family = 5;
+}
+
+
+// [brief]: Filter configuration and operational service.
+// [detail]: Filter configuration and operational service.
+// Filter Service defines a set of simple RPCs to operate upon the various
+// components, viz.
+//  - Filter.
+//  - Term.
+//  - Policer.
+//  - Filter Attachment/Bind Points.
+//  - Statistics.
+//
+// Each of RPCs are named by concatenating the corresponding Filter object and the operation
+// to be performed. This give a easy to understand semantics to the RPCs.
+service Firewall {
+
+    // [brief]: This RPC is used to add Filter onto a JUNOS device
+    // [detail]: This RPC is used to add complete Filter with provided
+    // all terms and returns the response with appropriate status.
+    rpc FilterAdd ( FilterAddRequest ) returns ( FilterAddResponse ) {}
+
+    // [brief]: This RPC is used to delete Filter on JUNOS device
+    // [detail]: This RPC is used to delete complete Filter. Term's are not
+    // required to be a part of Filter while deleting. Term's are not validated and
+    // untouched, Even if Term's are existing in Filter delete operation.
+    rpc FilterDelete ( FilterDeleteRequest ) returns ( FilterDeleteResponse ) {}
+
+    // [brief]: This RPC is to Modify one or more Term's in existing Filter.
+    // [detail]: Changes an Filter based on the list of Filter Terms provided,
+    // and returns the result. It is advisable to use this API to for small
+    // incremental changes. For wholesale changes, it is recommended to use
+    // TERM_OPERATION_REPLACE for all the Term's required to replace with same
+    // Term names. For replacing all Terms with new set of Terms, use Term operation as
+    // TERM_OPERATION_DELETE for existing Terms and TERM_OPERATION_ADD for NEW
+    // Term entries and prepend to the existing Terms with in Filter.
+    rpc FilterModify ( FilterModifyRequest ) returns ( FilterModifyResponse ) {}
+
+    // [brief]: This RPC used to Add binding of an Filter with given bind object and return the result.
+    // [detail]: Binds Filter to the provided bind object if exists in the device
+    // and provides the result. Note that the device can also have native cli
+    // Filters configured. Then the order of exection of Filter will follow as
+    // mentioned here:
+    // In Ingress direction:
+    // input_interface-> Client Filter -> CLI Filter -> route_lookup
+    // In Egress direction:
+    // route_lookup -> CLI Filter -> Client Filter -> output_interface.
+    rpc FilterBindAdd ( FilterObjBindAddRequest ) returns ( FilterBindAddResponse ) {}
+
+    // [brief]: This RPC Deletes a binding of an Filter with mentioned bind object and return the result.
+    // [detail]: Deletes a binding of an Filter with mentioned bind object and return the result.
+    rpc FilterBindDelete ( FilterObjBindDeleteRequest ) returns ( FilterBindDeleteResponse ) {}
+
+    // [brief]: This RPC Adds a policer and returns the result.
+    // [detail]: This RPC Adds a policer and returns the result.
+    rpc PolicerAdd ( PolicerAddRequest ) returns ( PolicerAddResponse ) {}
+
+    // [brief]: This RPC Modifies the existing policer and returns the result.
+    // [detail]: This RPC Modifies the existing policer and returns the result.
+    rpc PolicerModify( PolicerModifyRequest ) returns ( PolicerModifyResponse ) {}
+
+    // [brief]: This RPC deletes the existing policer and returns the result.
+    // [detail]: This RPC deletes the existing policer and returns the result.
+    rpc PolicerDelete( PolicerDeleteRequest ) returns ( PolicerDeleteResponse ) {}
+
+    // [brief]: This RPC is used to get the counter value of specified Filter counter
+    // [detail]: This RPC is used to get the counter value of specified counter
+    // in given Filter. Also few points to note with this API. Currently only 1
+    // counter get is supported.
+    // This call is going to be blocking for worst case of 10 seconds which is non configurable.
+    // The counter name is expected to be fully resolved.
+    rpc FilterCounterGet ( FilterCounterGetRequest ) returns ( FilterCounterGetResponse ) {}
+
+    // [brief]: This RPC is used to get the counter value of specified policer counter of given Filter
+    // [detail]: This RPC is used to get the counter value of specified policer counter
+    // in given Filter. Also few points to note with this API. Currently only 1 counter get
+    // is supported.
+    // This call is going to be blocking for worst case of 10 seconds which is non configurable.
+    // The counter name is expected to be fully resolved. For eg. for term specific policer counter
+    // it is expected to be passed to full counter name as
+    // <policer_name-term_name> .
+    rpc PolicerCounterGet ( PolicerCounterGetRequest ) returns ( PolicerCounterGetResponse ) {}
+
+    // [brief]: This RPC used to clear filter counter of given Filter.
+    // [detail]: Clears a particular counter or policer counter whose fully
+    // qualified name is provided along with associated Filter.
+    // Few points to note with this API. Currently only 1 counter get is supported.
+    // The counter name is expected to be fully resolved. For eg. for term specific policer counter
+    // it is expected to be passed to full counter name as
+    // <policer_name-term_name> .
+    rpc FilterCounterSet ( FilterCounterSetRequest )  returns ( FilterCounterSetResponse ) {}
+
+    // [brief]: This RPC used to clear policer counter of given Filter.
+    // [detail]: Clears a particular policer counter whose fully
+    // qualified name is provided along with associated.
+    // Few points to note with this API. Currently only 1 counter get is supported.
+    // The counter name is expected to be fully resolved. For eg. for term specific policer counter
+    // it is expected to be passed to full counter name as
+    // <policer_name-term_name> .
+    rpc PolicerCounterSet ( PolicerCounterSetRequest )  returns ( PolicerCounterSetResponse ) {}
+
+}

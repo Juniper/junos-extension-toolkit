@@ -1,0 +1,357 @@
+//
+// Copyright 2018, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file hosts services related to JUNOS Device management.
+// It provides APIs to:
+// - Query state/status using Operational Commands
+// - Set Configuration
+// - Query and set Ephemeral Configuration
+
+syntax = "proto3";
+
+package jnx.jet.management;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "18.4";
+
+// [brief]: Junos configuration and operational management service.
+// [detail]: Junos configuration and operational management service.
+service Management {
+
+    // [brief]: Run an operational command
+    // [detail]: This RPC returns the operational command output as a streamed response
+    rpc OpCommandGet (OpCommandGetRequest) returns
+    (stream OpCommandGetResponse) {}
+
+    // [brief]: Perform configuration operation on static database
+    // [detail]: Load and commit configuration onto a Junos device
+    rpc ConfigSet (ConfigSetRequest) returns (ConfigSetResponse) {}
+
+    // [brief]: Retrieve epehemral configuration from the device
+    // [detail]: Retrieve epehemral configuration from the device
+    rpc EphemeralConfigGet (EphemeralConfigGetRequest) returns
+    (EphemeralConfigGetResponse) {}
+
+    // [brief]: Perform configuration operation on the ephemeral database
+    // [detail]: Load and commit configuration onto Junos device's epehemral database
+    rpc EphemeralConfigSet (EphemeralConfigSetRequest) returns
+    (EphemeralConfigSetResponse) {}
+
+}
+
+// [brief]: Output format types for an operational command response
+// [default]: OP_COMMAND_OUTPUT_JSON
+enum OpCommandOutputFormat {
+    // [brief]: JSON format
+    OP_COMMAND_OUTPUT_JSON = 0;
+    // [brief]: XML format
+    OP_COMMAND_OUTPUT_XML = 1;
+    // [brief]: CLI Text format
+    OP_COMMAND_OUTPUT_CLI = 2;
+}
+
+// [brief]: Encoding format types for the returned configuration data
+// [default]: CONFIG_GET_OUTPUT_JSON
+enum ConfigGetOutputFormat {
+    // [brief]: JSON format
+    CONFIG_GET_OUTPUT_JSON = 0;
+    // [brief]: XML format
+    CONFIG_GET_OUTPUT_XML = 1;
+}
+
+// [brief]: Type of operation associcated with a configuration set request
+// [default]: CONFIG_OPERATION_UPDATE
+enum ConfigOperationType {
+    // [brief]: Update the config
+    CONFIG_OPERATION_UPDATE = 0;
+}
+
+// [brief]: The load operation type to apply for the configuration set request.
+// [default]: CONFIG_LOAD_MERGE
+enum ConfigLoadType {
+    // [brief]: Combines existing configuration with payload
+    // [detail]: Combine the configuration that is currently shown in the CLI with the
+    // input configuration (default)
+    CONFIG_LOAD_MERGE = 0;
+
+    // [brief]: Replace parts of existing configuration
+    // [detail]: Replace configuration data from the existing configuration with the ones
+    // referred to by the 'replace' tags in the input configuration. These
+    // replace tags come in various flavors depending on the config type:
+    // text -> to be replaced config text is preceded by 'replace: '
+    // xml  -> to be replaced element has attribute operation="replace"
+    // json  -> to be replaced object has metadata tag encoded with '@':
+    //             "object-to-be-replaced": {
+    //               "@": {
+    //                 "operation": "replace"
+    //               }
+    //             }
+    //
+    CONFIG_LOAD_REPLACE = 1;
+
+    // [brief]: Replace existing configuration with payload configuration
+    // [detail]: Discard the entire existing configuration and load the entire input
+    // configuration. Marks every object as changed.
+    CONFIG_LOAD_OVERRIDE = 2;
+
+    // [brief]: Update existing configuration hierarchies with payload configuration
+    // [detail]: Update existing configuration hierarchies with corresponding data from
+    // the input configuration. Marks only affected objects as changed
+    CONFIG_LOAD_UPDATE = 3;
+
+    // [brief]: Load input configuration consisting of set commands
+    // [detail]: Load input configuration consisting of set configuration mode commands.
+    // Input config can contain any configuration mode command, such as set,
+    // delete, edit, exit, and top.
+    CONFIG_LOAD_SET = 4;
+}
+
+// [brief]: Type of commit to run after loading the configuration
+// [default]: CONFIG_COMMIT
+enum ConfigCommitType {
+    // [brief]: Regular commit on current routing engine
+    CONFIG_COMMIT = 0;
+
+    // [brief]: Sync and commit config to both routing engines
+    CONFIG_COMMIT_SYNCHRONIZE = 1;
+}
+
+// [brief]: Config path from which to retrieve the configuration data
+// [detail]: Config path from which to retrieve the configuration data.
+// The 'id' needs to be set for each path request to help associate the
+// responses to the corresponding path.
+message ConfigPathRequest {
+    // [brief]: Identifier for the request
+    string id = 1;
+    // [brief]: Data model path to retrieve
+    string path = 2;
+}
+
+// [brief]: Configuration commit options
+// [detail]: Configuration commit options
+message ConfigCommit {
+    // [brief]: Specify the type of commit operation
+    // [detail]: This will specify the type of commit operation
+    // commit operation can be commit or commit-synchronize
+    ConfigCommitType type = 1;
+
+    // [brief]: Specify the comment for the commit log
+    string comment = 2;
+}
+
+// [brief]: Operational command request type to pass to the OpCommandGet RPC
+// [detail]: Operational command request type to pass to the OpCommandGet RPC
+message OpCommandGetRequest {
+    // [brief]: Command to be executed, represented in the required format
+    oneof command {
+    // [brief]: standard cli command input
+    string cli_command = 1;
+    // [brief]: xml command input
+    string xml_command = 2;
+    }
+
+    // [brief]: Output format, default is JSON
+    OpCommandOutputFormat out_format = 3;
+}
+
+// [brief]: Request message for executing an operational command
+// [detail]: Request message for executing an operational command
+message OpCommandGetResponse {
+    reserved 2;
+    reserved "sub_code";
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Operation command output
+    string data = 3;
+}
+
+// [brief]: Request for retrieving configuration data from an ephemeral database
+// [detail]: Request for retrieving configuration data from an ephemeral database
+message EphemeralConfigGetRequest {
+
+    // [brief]: Encoding format for the returned config
+    ConfigGetOutputFormat encoding = 1;
+
+    // [brief]: List of configuration paths to retrieve config for
+    repeated ConfigPathRequest config_requests = 2;
+
+    // [brief]: Name of ephemeral configuration database instance
+    // [detail]: Name of the Ephemeral configuration database instance to run this
+    // request on. This instance should have been configured previously.
+    // If instance_name is an empty string (default behavior), the default
+    // Ephemeral instance will be used.
+    string instance_name = 3;
+}
+
+// [brief]: Request type to represent the config responses from a EphemeralConfigGet RPC.
+// [detail]: Request type to represent the config responses from a EphemeralConfigGet RPC.
+message EphemeralConfigGetResponse {
+
+    reserved 2;
+    reserved "sub_code";
+
+    // [brief]: Response to ConfigPathRequest
+    // [detail]: Response corresponding to a ConfigPathRequest message sent over the
+    // EphemeralConfigGet RPC
+    message ConfigPathResponse {
+        reserved 2;
+        reserved "sub_code";
+
+        // [brief]: Status code and message for the corresponding ConfigPathRequest
+        jnx.jet.common.RpcStatus status = 1;
+
+        // [brief]: Response id corresponding to the ConfigPathRequest id
+        // [detail]: Response id corresponding to the ConfigPathRequest id. This helps
+        // map the config data retrieved to the requested config path.
+        string id = 3;
+
+        // [brief]: Requested config path
+        string path = 4;
+
+        // [brief]: Configuration data for the requested config path
+        // [detail]: Configuration data for the requested config path. This data maybe
+        // encoded using the encoding specified in set-data-encoding, or
+        // encoding specified in the request.
+        string value = 5;
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: List of responses for each configuration path request
+    repeated ConfigPathResponse config_responses = 3;
+}
+
+// [brief]: Request type for Ephemeral config database
+// [detail]: Request type to represent a group of config operations to be applied to the
+// Ephemeral config database.
+message EphemeralConfigSetRequest {
+
+    // [brief]: A message to represent a single config operation.
+    // [detail]: A message to represent a single config operation.
+    message ConfigOperation {
+
+        // [brief]: Identifier for this config operation
+        // [detail]: Identifier for this config operation. The corresponding response
+        // will contain this id to allow clients to map requests to correct
+        // operation responses.
+        string id = 1;
+
+        // [brief]: Type of configuration modification
+        // [detail]: The type of configuration modification requested for the
+        // corresponding path.Note that some commands, such as 'delete'
+        // do not specify any associated data with the path
+        ConfigOperationType operation = 2;
+
+        // [brief]: Configuration path to apply the operation
+        // [detail]: The configuration path to apply the operation to. This currently
+        // only supports the root configuration path "/" and any other string
+        // will throw an error. This implies the input config string must be a
+        // fully qualified config tree relative to the root.
+        string path = 3;
+
+        // [brief]: Input configuration data in the relevant format.
+        oneof value {
+        // [brief]: config in xml format
+        string xml_config = 4;
+        // [brief]: config in json format
+        string json_config = 5;
+        }
+    }
+
+    // [brief]: List of config operations to apply together as part of this request
+    repeated ConfigOperation config_operations = 1;
+
+    // [brief]: Name of the Ephemeral configuration database instance
+    // [detail]: Name of the Ephemeral configuration database instance to run this
+    // request on. This instance should have been configured previously.
+    // If instance_name is an empty string (default behavior), the default
+    // Ephemeral instance will be used.
+    string instance_name = 2;
+
+    // [brief]: Enable validation of config
+    bool validate_config = 3;
+
+    // [brief]: Do a load only operation
+    bool load_only = 4;
+}
+
+// [brief]: Request type to represent the config operation
+// [detail]: Request type to represent the config operation responses from a
+// EphemeralConfigSet RPC.
+message EphemeralConfigSetResponse {
+
+    reserved 2;
+    reserved "sub_code";
+
+    // [brief]: A message representing response to a single config operation request
+    // [detail]: A message representing response to a single config operation request
+    message ConfigOperationResponse {
+        reserved 2;
+        reserved "sub_code";
+
+        // [brief]: Status code and message for config operation request
+         jnx.jet.common.RpcStatus status = 1;
+
+        // [brief]: Response id corresponding to the ConfigRequest id
+        string id = 3;
+    }
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: List of responses for each configuration operation
+    repeated ConfigOperationResponse operation_responses = 3;
+}
+
+// [brief]: Request type of config operation
+// [detail]: Request type to represent the config operation to be performed on the
+// static Junos config database.
+message ConfigSetRequest {
+
+    // [brief]: Input configuration data in the relevant format
+    oneof config {
+    // [brief]: config in xml format
+    string xml_config = 1;
+    // [brief]: config in json format
+    string json_config = 2;
+    // [brief]: config in text format
+    string text_config = 3;
+    }
+
+    // [brief]: Type of config load operation
+    ConfigLoadType load_type = 4;
+
+    // [brief]: Commit info associated with this config operation
+    ConfigCommit commit = 5;
+}
+
+// [brief]: Request type of config operation
+// [detail]: Request type to represent the config operation response from a ConfigSet RPC.
+message ConfigSetResponse {
+    reserved 2;
+    reserved "sub_code";
+
+    // [brief]: RPC execution status information
+    jnx.jet.common.RpcStatus status = 1;
+}
