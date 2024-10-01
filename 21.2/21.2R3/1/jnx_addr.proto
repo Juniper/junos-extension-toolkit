@@ -1,0 +1,268 @@
+/*
+ * $Id$
+ *
+ * Copyright (c) 2015, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+package jnxBase;
+
+/*
+ * The format of network addresses that the server is to use when 
+ * responding to client requests.
+ */
+enum AddressFormat {
+    /** Addreses in replies will be represented by strings */
+    ADDRESS_STRING  = 0;
+
+    /** Addreses in replies will be represented by binary data in
+     *  byte arrays */
+    ADDRESS_BYTES   = 1;
+}
+
+/*
+ * Address family of a network address.
+ */
+enum AfType {
+	/** Not specified */
+    AF_UNSPECIFIED = 0;
+
+    /** IPv4 address family */
+    AF_INET        = 1;
+
+    /** IPv6 address family */
+    AF_INET6       = 2;
+
+    /** Ethernet MAC address family */
+    AF_MAC         = 3;
+}
+
+/*
+ * An IP address, which may be either IPv4 or IPv6 and be respresented
+ * by either a string or array of binary bytes. 
+ */
+message IpAddress {
+    oneof AddrFormat {
+
+         /** IP address string in standard format */
+        string        addr_string     = 1;
+
+        /** Binary IP address in network-ordered array of bytes */
+		bytes         addr_bytes      = 2;
+    }
+}
+
+/*
+ * An ethernet MAC address, which may be respresented by either a 
+ * string (formatted as six groups of two hexidecimal digits separated by
+ * colons) or array of binary bytes.
+ */
+message MacAddress {
+    oneof AddrFormat {
+
+        /** MAC address string in standard format */
+        string        addr_string     = 1;
+
+        /** Binary MAC address in network-ordered array of bytes */
+	bytes         addr_bytes      = 2;
+    }
+}
+
+/**
+ * Numeric ranges can be used to provide range of unsigned 32-bit values.
+ */
+message NumericRange {
+
+    /** Range Minimum value (inclusive). REQUIRED */
+    uint32 min = 1;
+
+    /** Range Maximum value (inclusive). REQUIRED */
+    uint32 max = 2;
+}
+
+/** List of Numeric Ranges */
+message NumericRangeList {
+    /** Range List for enums. OPTIONAL */
+    repeated NumericRange range_list = 1;
+}
+
+/**
+  * Protocol numbers for which ip header can be matched 
+  */
+enum IpProtocols {
+    IPPROT_INVALID = 0; /** Invalid or undefined value */
+    IPPROT_ICMP    = 1; /** Internet Control Message Protocol */
+    IPPROT_IGMP    = 2; /** Internet Group Management Protocol */
+    IPPROT_IPIP    = 4; /** IP in IP */
+    IPPROT_TCP     = 6; /** Transmission Control Protocol */
+    IPPROT_EGP     = 8; /** Exterior gateway protocol */
+    IPPROT_UDP     = 17; /** User Datagram Protocol */
+    IPPROT_RSVP    = 46; /** Resource Reservation Protocol */
+    IPPROT_GRE     = 47; /** Generic routing encapsulation */
+    IPPROT_ESP     = 50; /** IPSec Encapsulating Security Payload */
+    IPPROT_AH      = 51; /** IP Security authentication header */
+    IPPROT_ICMP6   = 58; /** Internet Control Message Protocol Version 6 */
+    IPPROT_OSPF    = 89; /** Open Shortest Path First */
+    IPPROT_PIM     = 103; /** Protocol Independent Multicast */
+    IPPROT_SCTP    = 132; /** Stream Control Transmission Protocol */
+}
+
+/**
+  * Well known port numbers for which ip header can be matched
+  */
+enum IpPorts {
+    option allow_alias = true;
+    IPPRT_INVALID        = 0;  /** Invalid or undefined value */
+    IPPRT_FTP_DATA       = 20; /** FTP data */
+    IPPRT_FTP            = 21; /** FTP */
+    IPPRT_SSH            = 22; /** Secure shell */
+    IPPRT_TELNET         = 23; /** Telnet */
+    IPPRT_SMTP           = 25; /** Simple Mail Transfer Protocol */
+    IPPRT_TACACS         = 49; /** TACACS or TACACS+ */
+    IPPRT_TACACS_DS      = 65; /** TACACS-DS */
+    IPPRT_DOMAIN         = 53; /** Domain Name System (DNS) */
+    IPPRT_DHCP           = 67; /** Dynamic Host Configuration Protocol */
+    IPPRT_BOOTPS         = 67; /** Bootstrap protocol server */
+    IPPRT_BOOTPC         = 68; /** Bootstrap protocol client */
+    IPPRT_TFTP           = 69; /** Trivial FTP */
+    IPPRT_FINGER         = 79; /** Finger */
+    IPPRT_HTTP           = 80; /** Hypertext Transfer Protocol */
+    IPPRT_KERBEROS_SEC   = 88; /** Kerberos Security */
+    IPPRT_POP3           = 110; /** Post Office Protocol 3 */
+    IPPRT_SUNRPC         = 111; /** Sun Microsystems remote procedure call */
+    IPPRT_IDENT          = 113; /** Ident */
+    IPPRT_NNTP           = 119; /** Network News Transport Protocol */
+    IPPRT_NTP            = 123; /** Network Time Protocol */
+    IPPRT_NETBIOS_NS     = 137; /** NetBIOS name service */
+    IPPRT_NETBIOS_DGM    = 138; /** NetBIOS DGM */
+    IPPRT_NETBIOS_SSN    = 139; /** NetBIOS session service */
+    IPPRT_IMAP           = 143; /** Internet Message Access Protocol */
+    IPPRT_SNMP           = 161; /** Simple Network Management Protocol */
+    IPPRT_SNMPTRAP       = 162; /** SNMP traps */
+    IPPRT_XDMCP          = 177; /** X Display Manager Control Protocol */
+    IPPRT_BGP            = 179; /** Border Gateway Protocol */
+    IPPRT_LDAP           = 389; /** Lightweight Directory Access Protocol */
+    IPPRT_MOBILEIP_AGENT = 434; /** Mobile IP agent */
+    IPPRT_MOBILIP_MN     = 435; /** Mobile IP MN */
+    IPPRT_MSDP           = 639; /** Multicast Source Discovery Protocol */
+    IPPRT_HTTPS          = 443; /** Secure HTTP */
+    IPPRT_SNPP           = 444; /** Simple paging protocol */
+    IPPRT_BIFF           = 512; /** Biff/Comsat */
+    IPPRT_EXEC           = 512; /** UNIX rexec */
+    IPPRT_LOGIN          = 513; /** UNIX rlogin */
+    IPPRT_WHO            = 513; /** UNIX rwho */
+    IPPRT_CMD            = 514; /** UNIX rsh */
+    IPPRT_SYSLOG         = 514; /** System log */
+    IPPRT_PRINTER        = 515; /** Printer */
+    IPPRT_TALK           = 517; /** UNIX Talk */
+    IPPRT_NTALK          = 518; /** New Talk */
+    IPPRT_RIP            = 520; /** Routing Information Protocol */
+    IPPRT_TIMED          = 525; /** UNIX time daemon */
+    IPPRT_KLOGIN         = 543; /** Kerberos rlogin */
+    IPPRT_KSHELL         = 544; /** Kerberos rsh */
+    IPPRT_LDP            = 646; /** Label Distribution Protocol */
+    IPPRT_KRB_PROP       = 754; /** Kerberos database propagation */
+    IPPRT_KRBUPDATE      = 760; /** Kerberos database update */
+    IPPRT_KPASSWD        = 761; /** Kerberos passwd */
+    IPPRT_SOCKS          = 1080; /** Socks */
+    IPPRT_AFS            = 1483; /** AFS */
+    IPPRT_PPTP           = 1723; /** Point-to-Point Tunneling Protocol */
+    IPPRT_RADIUS         = 1812; /** RADIUS authentication */
+    IPPRT_RADACCT        = 1813; /** RADIUS accounting */
+    IPPRT_ZEPHYR_SRV     = 2102; /** Zephyr server */
+    IPPRT_ZEPHYR_CLT     = 2103; /** Zephyr serv-hm connection */
+    IPPRT_ZEPHYR_HM      = 2104; /** Zephyr hostmanager */
+    IPPRT_NFSD           = 2049; /** Network File System */
+    IPPRT_EKLOGIN        = 2105; /** Encrypted Kerberos rlogin */
+    IPPRT_EKSHELL        = 2106; /** Encrypted Kerberos rsh */
+    IPPRT_RKINIT         = 2108; /** Kerberos remote kinit */
+    IPPRT_CVSPSERVER     = 2401; /** CVS pserver */
+}
+
+/**
+  * icmp type for which icmp header can be matched
+  */
+enum IcmpType {
+    ICMP_TYP_ECHO_REPLY            = 0; /** Echo reply */
+    ICMP_TYP_ECHO_REQUEST          = 8; /** Echo request */
+    ICMP_TYP_UNREACHABLE           = 3; /** Unreachable */
+    ICMP_TYP_SOURCE_QUENCH         = 4; /** Source quench */
+    ICMP_TYP_REDIRECT              = 5; /** Redirect */
+    ICMP_TYP_ROUTER_ADVERTISEMENT  = 9; /** Router advertisement */
+    ICMP_TYP_ROUTER_SOLICIT        = 10; /** Router solicit */
+    ICMP_TYP_TIME_EXCEEDED         = 11; /** Time exceeded */
+    ICMP_TYP_PARAMETER_PROBLEM     = 12; /** Parameter problem */
+    ICMP_TYP_TIMESTAMP             = 13; /** Timestamp */
+    ICMP_TYP_TIMESTAMP_REPLY       = 14; /** Timestamp reply */
+    ICMP_TYP_INFO_REQUEST          = 15; /** Informational request */
+    ICMP_TYP_INFO_REPLY            = 16; /** Informational reply */
+    ICMP_TYP_MASK_REQUEST          = 17; /** Mask request */
+    ICMP_TYP_MASK_REPLY            = 18; /** Mask reply */
+}
+
+/**
+  * icmp code for which icmp header can be matched
+  */
+enum IcmpCode {
+    option allow_alias = true;
+    ICMP_CODE_NETWORK_UNREACHABLE           = 0; /** Network unreachable */
+    ICMP_CODE_HOST_UNREACHABLE              = 1; /** Host unreachable */
+    ICMP_CODE_PROTOCOL_UNREACHABLE          = 2; /** Protocol unreachable */
+    ICMP_CODE_PORT_UNREACHABLE              = 3; /** Port unreachable */
+    ICMP_CODE_FRAGMENTATION_NEEDED          = 4; /** Fragmentation needed */
+    ICMP_CODE_SOURCE_ROUTE_FAILED           = 5; /** Source route failed */
+    ICMP_CODE_DESTINATION_NETWORK_UNKNOWN   = 6; /** Destination network unknown */
+    ICMP_CODE_DESTINATION_HOST_UNKNOWN      = 7; /** Destination host unknown */
+    ICMP_CODE_SOURCE_HOST_ISOLATED          = 8; /** Source host isolated */
+    ICMP_CODE_DESTINATION_NETWORK_PROHIBITED  = 9; /** Destination network prohibited */
+    ICMP_CODE_DESTINATION_HOST_PROHIBITED   = 10; /** Destination host prohibited */
+    ICMP_CODE_NETWORK_UNREACHABLE_FOR_TOS   = 11; /** Network unreachable for ToS */
+    ICMP_CODE_HOST_UNREACHABLE_FOR_TOS      = 12; /** Host unreachable for ToS */
+    ICMP_CODE_COMMUNICATION_PROHIBITED_BY_FILTERING = 13; /** Communication prohibited by filtering */
+    ICMP_CODE_HOST_PRECEDENCE_VIOLATION     = 14; /** Host precedence violation */
+    ICMP_CODE_PRECEDENCE_CUTOFF_IN_EFFECT   = 15; /** Precedence cutoff in effect */
+    ICMP_CODE_REDIRECT_FOR_NETWORK          = 0; /** Redirect for network */
+    ICMP_CODE_REDIRECT_FOR_HOST             = 1; /** Redirect for host */
+    ICMP_CODE_REDIRECT_FOR_TOS_AND_NET      = 2; /** Redirect for ToS and net */
+    ICMP_CODE_REDIRECT_FOR_TOS_AND_HOST     = 3; /** Redirect for ToS and host */
+    ICMP_CODE_TTL_EQ_ZERO_DURING_TRANSIT    = 0; /** TTL eq zero during transit */
+    ICMP_CODE_TTL_EQ_ZERO_DURING_REASSEMBLY = 1; /** TTL eq zero during reassembly */
+    ICMP_CODE_IP_HEADER_BAD                 = 0; /** IP header bad */
+    ICMP_CODE_REQUIRED_OPTION_MISSING       = 1; /** Required option missing */
+}
+
+
+/**
+  * tcp flags for which tcp header can be matched
+  */
+enum TcpFlags {
+    TCP_FLG_INVALID = 0; /** To satisfy protobuf compiler */
+    TCP_FLG_FIN     = 1; /** FIN */
+    TCP_FLG_SYN     = 2; /** SYN */
+    TCP_FLG_RST     = 4; /** RST */
+    TCP_FLG_PUSH    = 8; /** PUSH */
+    TCP_FLG_ACK     = 16; /** ACK */
+    TCP_FLG_URGENT  = 32; /** Urgent */
+}
+
+message IpFragementFlags {
+    bool  not_match       = 1;
+    bool  match           = 2;
+    bool  dont_fragement  = 3;
+    bool  is_a_fragement  = 4;
+    bool  first_fragement = 5;
+    bool  last_fragement  = 6;
+}  
+
+/**
+  * ip fragment bit for which ip header can be matched
+  */
+enum IpFragment {
+    IP_FRAG_FLOW_DONT_FRAGMENT    = 0; /**  Don't Fragment flag is set */
+    IP_FRAG_FLOW_IS_FRAGMENT      = 1; /** Fragmented packet */
+    IP_FRAG_FLOW_FIRST_FRAGMENT   = 2; /** First fragment */
+    IP_FRAG_FLOW_LAST_FRAGMENT    = 3; /** Last fragment */
+    IP_FRAG_FLOW_IS_NOT_FRAGMENT  = 4; /** Not a fragment */
+}

@@ -1,0 +1,866 @@
+//
+// Copyright 2018-2020, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: JET Routing Base Package.
+package jnx.jet.routing.base;
+
+// [version]: 0.0.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version.
+option (jnx.jet.common.japi_version) = "0.2.0";
+
+option (jnx.jet.common.junos_release) = "20.4";
+
+// [brief]: Route Table Format used by server.
+// [detail]: The table format allows the client to request the format that
+// the server should use to represent tables in replies sent by the server
+// to the client.
+// [default]: TABLE_STRING
+enum RouteTableFormat {
+     // [brief]: The server will represent tables by name as strings.
+     TABLE_STRING  = 0;
+
+     // [brief]: The server will represent tables by RPD table ID.
+     TABLE_ID      = 1;
+}
+
+// [brief]: Route table name - A string formatted per JUNOS convention.
+// [detail]: Routing table (RIB) name uniquely identifying a route table,
+// formatted as a string per JUNOS convention.
+message RouteTableName {
+    // [mandatory]:
+    // [brief]: Table name.
+    string name = 1;
+}
+
+// [brief]: Route table identifier: An integer value uniquely identifying
+// a table.
+// [detail]: Routing table identifier as an integer value uniquely identifying
+// a table.
+message RouteTableId {
+    // [mandatory]:
+    // [brief]: Table identifier.
+    uint32 id = 1;
+}
+
+// [brief]: Routing table (RIB)
+// [detail]: Routing table (RIB) may either be specified as a string or
+// RPD table ID.
+message RouteTable {
+    // [brief]: Route table format either with id or name.
+    oneof route_table_format {
+        // [brief]: Table id to which the route belongs.
+        RouteTableId    id    = 1;
+        // [brief]: Table name to which the route belongs.
+        RouteTableName  name  = 2;
+    }
+}
+
+// [brief]:  Route prefix address family types.
+// [detail]: Routing table destination address family types.
+// [default]: RT_AF_UNSPEC
+enum RouteAfType {
+     // [brief]: Unspecified.
+     RT_AF_UNSPEC    =  0;
+
+     // [brief]: IPv4 destination prefix.
+     RT_AF_INET      =  1;
+
+     // [brief]: IPv6 destination prefix.
+     RT_AF_INET6     =  2;
+
+     // [brief]: IPv4 VPN (L3VPN) destination prefix.
+     RT_AF_INETVPN   =  3;
+
+     // [brief]: IPv6 VPN (L3VPN) destination prefix.
+     RT_AF_INET6VPN  =  4;
+
+     // [brief]: IPv4 Labeled-Unicast destination prefix.
+     RT_AF_LABELED_INET   =  5;
+
+     // [brief]: IPv6 Labeled-Unicast destination prefix.
+     RT_AF_LABELED_INET6  =  6;
+
+     // [brief]: IPv4 SRTE destination prefix.
+     RT_AF_INET_SRTE      =  7;
+
+     // [brief]: IPv6 SRTE destination prefix.
+     RT_AF_INET6_SRTE     =  8;
+
+     // [brief]: IPv4 Flowspec prefix.
+     RT_AF_INET_FLOWSPEC  =  9;
+
+     // [brief]: IPv4 Flowspec prefix.
+     RT_AF_INET6_FLOWSPEC =  10;
+}
+
+// [brief]: RFC 4364 Route type 0.
+// [detail]: 2-byte AS and 4-byte assigned number.
+// [range]: 2-byte assigned number 0:65,535.
+// 4-byte assigned number 0:4,294,967,295.
+message RdType0 {
+    // [brief]: 2 byte AS number
+    uint32                as_number       = 1;
+    // [brief]: 4 byte assigned number subfield
+    uint32                assigned_number = 2;
+}
+
+// [brief]: RFC 4364 Route type 1
+// [detail]: 4-byte IPv4 address and 2-byte assigned number.
+// [range]: 2-byte assigned number 0:65,535.
+message RdType1 {
+    // [brief]: 4 byte IP address
+    jnx.jet.common.IpAddress     ip_address      = 1;
+    // [brief]: 2 byte assigned number subfield
+    uint32                assigned_number = 2;
+}
+
+// [brief]:  RFC 4364 Route type 2
+// [detail]: 4-byte AS and 2-byte assigned number.
+// [range]: 2-byte assigned number 0:65,535.
+// 4-byte assigned number 0:4,294,967,295.
+message RdType2 {
+    // [brief]:  4 byte AS number.
+    uint32                as_number       = 1;
+    // [brief]:  2 byte assigned number subfield.
+    uint32                assigned_number = 2;
+}
+
+// [brief]: RFC 4364 route distinguisher.
+// [detail]: To distinguish customer VPN routes.
+// within the BGP NLRIs. Valid RD can be type 0, type 1, or type 2.
+message RouteDistinguisher {
+    // [brief]: Any one of the below route distinguisher.
+    oneof rd_format {
+        // [brief]: Type 0 RD.
+        RdType0     rd0 = 1;
+        // [brief]: Type 1 RD.
+        RdType1     rd1 = 2;
+        // [brief]: Type 2 RD.
+        RdType2     rd2 = 3;
+    }
+}
+
+// [brief]: L3VPN Address.
+// [detail]: L3VPN address is composed of a route distinguisher (RD)
+// and IP address.
+message L3vpnAddress {
+    // [mandatory]:
+    // [brief]: Route distinguisher.
+    RouteDistinguisher    rd = 1;
+
+    // [mandatory]:
+    // [brief]: IPv4 or IPv6 VPN customer address.
+    jnx.jet.common.IpAddress     vpn_addr = 2;
+}
+
+// [brief]: A single MPLS Label entry.
+// [detail]: A single MPLS Label entry as defined by RFC 3032.
+message LabelEntry {
+    // [mandatory]:
+    // [brief]: A valid 20-bit unsigned label.
+    // [range]: Label value must be less than decimal
+    // value 1048576 and not within the reserved label range
+    // of 4 through 15 (inclusive).
+    uint32 label                    = 1;
+
+    // [brief]: A valid 3-bit unsigned traffic class/QoS value less
+    // than decimal value 8. Optional (defaults to 0). READ-ONLY.
+    uint32 traffic_class            = 2;
+
+    // [brief]: A valid 8-bit unsigned TTL value less than decimal value 256.
+    // Optional (defaults to 0). READ-ONLY.
+    uint32 ttl                      = 3;
+
+    // [brief]: Indicates that this Label stack entry the bottom of the label
+    // stack. Bottom-of-Stack will always be set by the library and must
+    //  never set by the client. READ-ONLY.
+    bool bottom_of_stack            = 4;
+}
+
+// [brief]:  Label operations.
+// [detail]: MPLS label operation type.
+// [default]: NOOP
+enum LabelOperation {
+    //[brief]: No operation.
+    NOOP    = 0;
+    //[brief]: Label removal.
+    POP     = 1;
+    //[brief]: Label Addition.
+    PUSH    = 2;
+    //[brief]: Label swap .
+    SWAP    = 3;
+}
+
+// [brief]: MPLS Label stack entry.
+// [detail]: A single MPLS Label stack entry with the operation for the
+// label entry.
+message LabelStackEntry {
+    // [brief]: operation code.
+    LabelOperation      opcode      = 1;
+    // [brief]: label entry.
+    LabelEntry          label_entry = 2;
+}
+
+// [brief]: MPLS Address.
+// [detail]:  Holds the MPLS label used to represent label address in route
+// lookups.
+message MplsAddress {
+    // [mandatory]:
+    // [brief]:  A valid 20-bit unsigned label value.
+    // [mandatoty]:
+    // [range]: less than 1048576.nd not within the reserved label range of 4
+    // through 15 (inclusive).
+    uint32  label = 1;
+}
+
+// [brief]: Label Stack.
+// [detail]: A label stack constructed according to the rules of RFC 3032.
+message LabelStack {
+    // [mandatory]:
+    // [brief]: label stack entries.
+    // [detail]: An ordered list of one or more label stack entries beginning
+    // with the bottom of the stack and ending with the top of the stack.
+    repeated LabelStackEntry entries = 1;
+}
+
+// [brief]: Segment Identifier (SID).
+// [detail]: Segment Identifier (SID). Either 4 octet MPLS SID or a 16 octet
+// IPv6 SID. Currently IPv6 SID is not supported.
+message SidEntry {
+    // [brief]: only one field can be set at the same time.
+    oneof sid_entry_type {
+        // [brief]: MPLS label for the SID.
+        LabelEntry  sid_label_entry  = 1;
+   }
+}
+
+// [brief]:  Segment Type 1.
+// [detail]:  Segment Type 1: SID only, in the form of MPLS Label.
+message SegmentType1 {
+    // [mandatory]:
+    // [brief]:  MPLS label for the SID.
+    LabelEntry  sid_label_entry = 1;
+}
+
+// [brief]: SR-TE Segment.
+// [detail]: SR-TE Segment. Only SegmentType1 is currently supported.
+// Other types are for internal use only.
+message SRTESegment {
+    // [brief]: segment type.
+    oneof srte_type {
+        // [brief]: Segment type1, only supported segment type at present.
+        SegmentType1   segment_type1 = 1;
+    }
+}
+
+// [brief]:  SR-TE Segment List.
+// [detail]:  List of Explicit paths towards endpoint. One or more segment
+// lists to program. Segment List entries. Minimum one segment need to be set.
+message SRTESegmentList {
+    // [brief]: Weight associated with segment list.
+    // [detail]: Weight specifies the weight associated to a given segment
+    // list. The weight is used in order to apply weighted ECMP mechanism
+    // when steering traffic into a policy that includes multiple Segment
+    // Lists. This parameter is needed to be set only when > 1 segment list
+    // is set.
+    uint32              weight  = 1;
+
+    // [mandatory]:
+    // [brief]: Segments, one or more segments can be programmed.
+    // [range]: A maximum of 5 segments are supported.
+    repeated SRTESegment  segments = 2;
+}
+
+// [brief]: SR-TE Distinguisher.
+// [detail]:  Value that uniquely identifies the policy in the context of
+// <destination, color> tuple. SR policy originator can use this to make
+// policy unique in terms of BGP NLRI by setting different values for
+// multiple occurrences of same SR policy.
+message SRTEDistinguisher {
+     // [brief]: SR policy originator.
+     // [detail]: SR policy originator. This is a numeric value that the
+     // originator can use to make unique when there are multiple occurrences
+     // of same SR policy. There is no verification done for the value of
+     // this, it has to be set and should be a non zero value.
+     uint32 distinguisher = 1;
+}
+
+// [brief]: SR-TE Color.
+// [detail]: Value used to match destination prefix to the policy.
+// All prefixes of a particular color value is steered into policy that
+// has the same color value.
+message SRTEColor {
+     // [brief]: SR policy color used to match destination prefix to policy..
+     // [detail]: SR policy color. This is a value used to match destination
+     // prefix to the policy. All prefixes of a particular color value is
+     // steered into policy that has the same color.
+     uint32 color = 1;
+}
+
+// [brief]: SR-TE Binding SID.
+// [detail]: This is an optional parameter. Note IPv6 Binding SID not
+// supported so in SidEntry only MPLS label SID is defined.
+message SRTEBindingSID {
+     // [brief]: Binding SID
+     SidEntry  binding_sr_id  = 1;
+}
+
+// [brief]: SR-TE Tunnel Name.
+// [detail]: This message is used to specify the SR-TE name. If the SR-TE route
+//           added ends up getting advertised this name will be used as the SR-TE
+//           policy name in the advertised BGP route.
+message SRTEName {
+     /// [brief]: SRTE Policy Name
+     string  tunnel_name = 1;
+}
+
+// [brief]: SR-TE Priority.
+// [detail]: This message specifies the priority with which BGP SR-TE route is
+//           processed. Currently not used in JUNOS, but it will be advertised.
+message SRTEPriority {
+     // [brief]: SRTE Priority
+     uint32  srte_priority = 1;
+}
+
+// [brief]: Explicit Null Label Policy (ENLP) Operations.
+// [detail]: This operation can be used to specify the Explicit NULL action.
+//           Possible operations indicate if IPv4 or IPv6 Explicit Null
+//           need to be pushed.
+// [default]: SRTE_ENLP_INVALID_VAL
+enum SRTEEnlpOperations {
+    SRTE_ENLP_INVALID_VAL             = 0;
+    PUSH_IPV4_EXP_NULL_LABEL          = 1;
+    PUSH_IPV6_EXP_NULL_LABEL          = 2;
+    PUSH_IPV4_OR_IPV6_EXP_NULL_LABEL  = 3;
+    DO_NOT_PUSH_EXPLICIT_NULL_LABEL   = 4;
+}
+// [brief]: SR-TE Explicit Null Label Policy (ENLP).
+// [detail]: This message is used to specify the ENLP operations for the SR-TE route.
+message SRTEEnlp {
+     // [brief]: SRTE ENLP
+     SRTEEnlpOperations  srte_enlp = 1;
+}
+
+
+// [brief]: SR-TE Address key fields.
+// [detail]: SR-TE address mesaage type with key fileds destination,color and distinguisher.
+message SRTEAddress {
+    // [mandatory]:
+    // [brief]: Identifies endpoint of the policy.
+    jnx.jet.common.IpAddress      destination   = 1;
+
+    // [mandatory]:
+    // [brief]: Value used to match destination prefix to the policy.
+    SRTEColor              sr_color         = 2;
+
+    // [mandatory]:
+    // [brief]: SR-TE Distinguisher
+    SRTEDistinguisher      sr_distinguisher = 3;
+}
+
+// [brief]: SR-TE Route information like segments.
+// [detail]: Address specific route data for IPv4 and IPv6 SRTE
+// address families.
+message SRTERouteData {
+    // [brief]: Specifies the BSID of the path.
+    // OPTIONAL
+    SRTEBindingSID           binding_sid   = 1;
+
+    // [brief]: Preference value of the route data.
+    // [detail]: Preference value is used by receiver to select among
+    // different SR paths of the same SR policy. SR policies may be
+    // originated by ways other than BGP.
+    // [default_value]: 0
+    // OPTIONAL
+    uint32                   preference    = 2;
+
+    // [mandatory]:
+    // [brief]:  List of Explicit paths towards endpoint.
+    repeated SRTESegmentList segment_lists = 3;
+
+    // [optional];
+    // [brief]: SRTE tunnel Name.
+    // This is used locally in the router and advertised by BGP to its peers.
+    SRTEName           sr_name         = 4;
+
+    // [optional];
+    // [brief]: SRTE Priority.
+    SRTEPriority       sr_priority      = 6;
+
+    // [optional];
+    // [brief]: SRTE ENLP.
+    // Possible values are defined in enum SRTEEnlpOperations.
+    SRTEEnlp           sr_enlp          = 7;
+}
+
+// [brief]: Flowspec route data.
+// [detail]: For matched packets the action can be discard, change DSCP
+// marking, rate limit, redirect into a VRF or sample. At least one action
+// must set. Only one terminating action can be set.
+message FlowspecRouteData {
+
+    // [brief]: Action to discard matching packet.
+    // [default_value]: FALSE
+    bool                discard = 1;
+
+    // [brief]: Action to change the DSCP value to matching packets with this value.
+    // [default_value]: 0
+    uint32              mark_dscp = 2;
+
+    // [brief]: Action to rate limit matching packets to this value.
+    // [default_value]: 0
+    uint32              rate_limit_val = 3;
+
+    // [brief]: Action to redirect matching packets to the route target specified.
+    string              redirect_inst_rt_comm = 4;
+
+    // [brief]: Action to sample matching packets.
+    // [default_value]: FALSE
+    bool                sample = 5;
+}
+
+// [brief]: Address family specific route data.
+// [detail]: message type with Route data defined for each supported address family.
+message AddressFamilySpecificData {
+    // [brief]: Route family of the address data.
+     oneof route_data_af {
+         // [brief]: SRTE policy data.
+         // [detail]: Address specific route data for IPv4 and IPv6 SRTE
+         // address families. This has to be set when route_prefix_af is of
+         // type IPv4 and IPv6 SRTE address family.
+         SRTERouteData    srte_policy_data = 1;
+
+         // [brief]: Flowspec data.
+         // [detail]: Address specific route data for IPv4 and Ipv6 flow-spec
+         // address families.
+         // This has to be set when route_prefix_af is of type IPv4 and IPv6
+         // flow-spec address family.
+         FlowspecRouteData flowspec_data = 2;
+     }
+}
+
+// [brief]: BGP Multicast S-PMSI A-D Route Address key fields.
+// [detail]: BGP Multicast S-PMSI A-D route with source, group and upstream router
+//           information.
+message BGPMulticastRouteSpmsi {
+    // [mandatory]:
+    // [brief]: Route distinguisher.
+    RouteDistinguisher    rd = 1;
+
+    // [mandatory]:
+    // [brief]: source_address prefix length
+    uint32            source_prefix_len   = 2;
+
+    // [mandatory]:
+    // [brief]: IPv4 or IPv6 multicast source address. Address family should be
+    // same as the family of the BGP Multicast address.
+    jnx.jet.common.IpAddress source_address  = 3;
+
+    // [mandatory]:
+    // [brief]: group prefix length
+    uint32            group_prefix_len   = 4;
+
+    // [mandatory]:
+    // [brief]: IPv4 or IPv6 multicast group address. Address family should be
+    // same as the family of the BGP Multicast address.
+    jnx.jet.common.IpAddress group_address   = 5;
+
+    // [mandatory]:
+    // [brief]: IPv4 or IPv6 Router address, BGP mcast route is intended for.
+    // Address family should be same as the family of the BGP Multicast address.
+    jnx.jet.common.IpAddress router_address = 6;
+}
+
+// [brief]: BGP Multicast key fields.
+// [detail]: BGP Multicast address message type which can be one of multiple
+//           route key types.
+message BGPMulticastRouteKey {
+
+    // [mandatory]:
+    // [brief]: Route key type
+    oneof bgpmcast_rt_key_type {
+
+	// [brief]: S-PMSI AD Route type
+	BGPMulticastRouteSpmsi rt_spmsi = 1;
+    }
+}
+
+// [brief]: BGP Multicast Leaf A-D Address Route key fields.
+// [detail]: BGP Multicast Leaf A-D route with route key and originating
+//           router information.
+message BGPMulticastRouteLeaf {
+
+    // [mandatory]:
+    // [brief]: Route Key within leaf AD route
+    BGPMulticastRouteKey     rt_key = 1;
+
+    // [mandatory]:
+    // [brief]: IPv4 or IPv6 Leaf router address. Address family should be same
+    // as the family of the BGP Multicast address.
+    jnx.jet.common.IpAddress leaf_address = 2;
+}
+
+// [brief]: BGP Multicast address key fields.
+// [detail]: BGP Multicast address message type which can be one of multiple
+//           route types. If BGP IPv4 Multicast address, all the IpAddress
+//           subfields within the message should be IPv4 addresses. Similary if
+//           BGP IPv6 Multicast address, all the IpAddress subfields should be
+//           IPv6 addresses.
+message BGPMulticastAddress {
+
+    // [mandatory]:
+    // [brief]: Route type
+    oneof bgpmcast_rt_type {
+
+	// [brief]: Route Leaf AD
+	BGPMulticastRouteLeaf rt_leaf = 1;
+    }
+}
+
+// [brief]: Flowspec address.
+// [detail]: FlowspecAdress has match fields that can be used to match fields of a
+// IP header. If the match is sucessful then the action will be applied to the
+// IP packet. The actions can be chained if further actions needs to be
+// applied after previous action is complete. These actions are defined as
+// protocol specific data.
+//
+// IP header fields than can be matched are destination ip address, source
+// IP address, protocol, destination/source port, ICMP types/codes, DSCP
+// and fragment bit.
+//
+// At least one of the match condition should be set.
+message FlowspecAddress {
+    // [brief]: IP packet destination prefix to match for filtering.
+    // OPTIONAL
+    jnx.jet.common.IpAddress         destination       = 1;
+
+    // [brief]: IP packet destination prefix length.
+    // [detail]: This field if not set when destination is
+    // set will default to HOST length for the address family.
+    // i.e. 32 for IPv4 and 128 for IPv6.
+    // This along with destination determines the IP destination field
+    // matching range.
+    // For e.g. if destination = 10.1.1.0 and dest_prefix_len = 24 then
+    // flows-spec filter added will match all IP packets with destination
+    // address 10.1.1.1 to 10.1.1.254.
+    // OPTIONAL
+    uint32                    dest_prefix_len   = 2;
+
+    // [brief]: IP packet source address to match for filtering.
+    // OPTIONAL
+    jnx.jet.common.IpAddress         source            = 3;
+
+    // [brief]: IP source prefix length.
+    // [detail]: IP packet source address prefix length that will determine
+    // the source address range matched for filtering. The range matched is
+    // similar to dest_prefix_len described above.
+    // OPTIONAL
+    uint32                    source_prefix_len = 4;
+
+    // [brief]: Range of IP protocols to be matched while filtering.
+    // [detail]: A range of numerical values can be specified to match.
+    // Standard protocol values defined by IANA can be used in these
+    // numerical ranges.
+    // Ref: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+    // Note that the values are not validated, used as is mentioned in range.
+    //
+    // The ranges will be merged if they overlap and can be represented by a
+    // single range.
+    // For e.g. if ranges 1-20 and 15-30 are set they will merged into a single
+    // range 1-30.
+    // If a single value needs to specified both min and max in NumericRange
+    // should be set to the same value.
+    // This comment applies to all the following fields defined below:
+    // ip_protocols, ports, dest_ports, src_ports, icmp_types, icmp_codes,
+    // pkt_lengths and dscp.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  ip_protocols      = 5;
+
+    // [brief]: Destination and source ports of IP packet to match for filtering.
+    // [detail]: Standard port values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  ports             = 6;
+
+    // [brief]: Destination ports of IP packet to match for filtering.
+    // [detail]: Standard port values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  dest_ports        = 7;
+
+    // [brief]: Source ports of IP packet to match for filtering.
+    // [detail]: Standard port values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  src_ports         = 8;
+
+    // [brief]: ICMP types to match for filtering.
+    // [detail]: Standard ICMP type values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml#icmp-parameters-types
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  icmp_types        = 9;
+
+    // [brief]: ICMP codes to match for filtering.
+    // [detail]: Standard ICMP code values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml#icmp-parameters-codes
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  icmp_codes        = 10;
+
+    // [brief]: TCP flags to match for filtering.
+    // OPTIONAL
+    jnx.jet.common.TcpFlags          tcp_flags         = 11;
+
+    // [brief]: ICMP types to match for filtering.
+    // [detail]: Standard ICMP type values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml#icmp-parameters-types
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  pkt_lengths       = 12;
+
+    // [brief]: ICMP types to match for filtering.
+    // [detail]: Standard ICMP type values defined by IANA can be used for this.
+    // Ref: https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml#icmp-parameters-types
+    // Note that the values are not validated, used as is mentioned in range.
+    // OPTIONAL
+    jnx.jet.common.NumericRangeList  dscps             = 13;
+
+    // [brief]: IP framgment flags to match for filtering.
+    // OPTIONAL
+    jnx.jet.common.IpFragementFlags  fragment          = 14;
+}
+
+// [brief]: Route destination prefix.
+// [detail]:Route destination prefix defined for each supported address family.
+message RoutePrefix {
+    // [brief]: only one field from the below can be set at the same time.
+    oneof route_prefix_af {
+        // [brief]: IPv4 destination prefix.
+        jnx.jet.common.IpAddress     inet         = 1;
+
+        // [brief]: IPv6 destination prefix.
+        jnx.jet.common.IpAddress     inet6        = 2;
+
+        // [brief]: IPv4 VPN (L3VPN) destination prefix.
+        L3vpnAddress          inetvpn      = 3;
+
+        // [brief]: IPv6 VPN (L3VPN) destination prefix.
+        L3vpnAddress          inet6vpn     = 4;
+
+        // [brief]: IPv4 Labeled-Unicast destination prefix.
+        jnx.jet.common.IpAddress     labeled_inet  = 5;
+
+        // [brief]: IPv6 Labeled-Unicast destination prefix.
+        jnx.jet.common.IpAddress     labeled_inet6 = 6;
+
+        // [brief]: IPv4 SR-TE policy prefix.
+        SRTEAddress           inet_srte_policy = 7;
+
+        // [brief]: IPv6 SR-TE policy prefix.
+        SRTEAddress           inet6_srte_policy = 8;
+
+        // [brief]: IPv4 BGP flowspec prefix.
+        FlowspecAddress       inet_flowspec  = 9;
+
+        // [brief]: IPv6 BGP flowspec prefix.
+        FlowspecAddress       inet6_flowspec = 10;
+
+	// [brief]: BGP Multicast IPv4 prefix.
+	BGPMulticastAddress       inet_bgpmcast = 11;
+
+	// [brief]: BGP Multicast IPv6 prefix.
+	BGPMulticastAddress       inet6_bgpmcast = 12;
+    }
+}
+
+// [brief]: Network Address.
+// [detail]: Network address defined for each supported address family.
+message NetworkAddress {
+    // [brief]: only one field from the below can be set at the same time.
+    oneof af {
+        // [brief]: IPv4 destination prefix.
+        jnx.jet.common.IpAddress     inet         = 1;
+
+        // [brief]: IPv6 destination prefix.
+        jnx.jet.common.IpAddress     inet6        = 2;
+
+        // [brief]:  MPLS label.
+        // [detail]: For modifying route table contents, the only valid
+        // prefix length is 52 (20 bit label + 32 bit interface index).
+        // Interface index is currently implicit and defaults to 0.
+        // For route lookups, use a prefix length of 52 for exact lookups and
+        // 0 for matching all the routes.
+        MplsAddress      mpls   = 3;
+    }
+}
+
+// [brief]:  Protocol types.
+// [detail]: define protocols that added the route.
+// RTPROTO_OTHER denotes other internal protocols currently not exposed
+// to API.
+// [default]: PROTO_ANY
+enum RouteProtoType {
+    // [brief]: Matches any protocol.
+    PROTO_ANY = 0;
+    // [brief]: route is directly connected.
+    PROTO_DIRECT = 1;
+    // [brief]: route to local side of P2P interface.
+    PROTO_LOCAL = 2;
+    // [brief]: route was installed in kernel previously.
+    PROTO_KERNEL = 3;
+    // [brief]: route was received via a redirect.
+    PROTO_REDIRECT = 4;
+    // [brief]: OSPF2 AS Internal routes.
+    PROTO_OSPF = 5;
+    // [brief]: OSPF3 AS Internal routes.
+    PROTO_OSPF3 = 6;
+    // [brief]: OSPF AS Internal routes.
+    PROTO_OSPF_ANY = 7;
+    // [brief]: Routing Information protocol.
+    PROTO_RIP = 8;
+    // [brief]: Routing Information protocol for v6.
+    PROTO_RIPNG = 9;
+    // [brief]: Border gateway protocol.
+    PROTO_BGP = 10;
+    // [brief]: route is static.
+    PROTO_STATIC = 11;
+    // [brief]: IS-IS.
+    PROTO_ISIS = 12;
+    // [brief]: For IGMP stuff.
+    PROTO_IGMP = 13;
+    // [brief]: Aggregate route.
+    PROTO_AGGREGATE = 14;
+    // [brief]: Distance Vector Multicast Routing Protocol.
+    PROTO_DVMRP = 15;
+    // [brief]: Protocol Independent Multicast.
+    PROTO_PIM = 16;
+    // [brief]:  Multicast Source Discovery Protocol.
+    PROTO_MSDP = 17;
+    // [brief]: MPLS switching.
+    PROTO_MPLS = 18;
+    // [brief]: RSVP.
+    PROTO_RSVP = 19;
+    // [brief]: Circuit Cross-Connect.
+    PROTO_CCC = 20;
+    // [brief]: LDP.
+    PROTO_LDP = 21;
+    // [brief]: VPN protocol, L3.
+    PROTO_VPN = 22;
+    // [brief]: MVPN protocol, L3.
+    PROTO_MVPN = 23;
+    // [brief]: multicast info.
+    PROTO_MCAST = 24;
+    // [brief]: VPN protocol, L2.
+    PROTO_L2VPN = 25;
+    // [brief]: l2circuit protocol.
+    PROTO_L2CKT = 26;
+    // [brief]: BGP Static.
+    PROTO_BGP_STATIC = 27;
+    // [brief]:RIFT.
+    PROTO_RIFT = 28;
+    // [brief]: Protocols not exposed and internal to Routing backend.
+    PROTO_OTHER = 29;
+}
+
+// [brief]: Communities.
+// [detail]: A single community is a string identifying a regular, extended,
+// or well-known community name or values with no whitespace.
+//
+// The communities will be recognized:
+//
+// Well-known communities:
+//    no-export
+//    no-advertise
+//    no-export-confed
+//    llgr-stale
+//    no-llgr
+//
+// RFC 1997 communities:
+//    domain-id:ipaddress:0
+//    domain-id-vendor:
+//    <n>:<n>
+//
+// Route targets extended communities:
+//    target:ipv4-address:16 bit#
+//    target:16bit#:32bit#
+//    target:as2b:16bit#:32bit#
+//    target:as4b:32bit#:16bit#
+//
+// Origin extended communities:
+//    origin:ipv4-address:16 bit#
+//    origin:16bit#:32bit#
+//
+// Bandwidth management extended communities:
+//    bandwidth:16bit#:bw
+//    {traffic-rate}:16 bit#:bw
+//
+// Redirect extended communities:
+//    redirect:ipv4-address:16 bit#
+//    redirect:16bit#:32bit#
+//
+// Tunnel encapsulation extended communities:
+//    encapsulation:0L:tunnel-type
+//
+message Community {
+    // [mandatory]:
+    // [brief]: A string that uniquely identifies a single regular,extended, or well-known community.
+    // [range]: A community string must not exceed 1023 characters.
+    string community = 1;
+}
+
+// [brief]: A list of communities.
+// [detail]: A list of individual communties.
+message Communities {
+    // [brief]: An unordered list of zero, one, or more individual communities.
+    // A Community list may not exceed 256 communities.
+    repeated Community communities = 1;
+}
+
+// [brief]: AS Paths.
+// [detail]: AS path through which the route was learned.
+//
+// An AS Path is a string composed of an series of AS numbers
+// separated by whitespace special delimiters.
+// The following special delimiting characters are used for signifying
+// confederations, confederation-sets, and AS-sets:
+//
+//     [ ] - Brackets enclose the local AS number associated with the AS set
+//     if more than one AS number is configured on the routing device,
+//     or if AS path prepending is configured.
+//
+//     ( ) - Parentheses enclose a confederation.
+//
+//     ( [ ] ) - Parentheses and brackets enclose a confederation set.
+//
+// Programmed AS Paths implicitly have path origin IGP.
+message AsPath {
+    // [mandatory]:
+    // [brief]: A string listing AS numbers.
+    // [detail]: A string listing AS numbers separated by whitespace and special
+    // delimiter charaters (see message as-path).
+    // [range]: An AS Path must not exceed 1023 characters.
+    string aspath = 1;
+}
