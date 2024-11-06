@@ -1,0 +1,194 @@
+//
+// Copyright 2018-2019, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: JET Routing Base Package
+package jnx.jet.routing.base;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+// [version]: 0.0.0
+import "jnx_routing_base_types.proto";
+
+// [changes]: Added RouteSummaryGet rpc
+option (jnx.jet.common.japi_version) = "0.1.0";
+
+option (jnx.jet.common.junos_release) = "19.2";
+
+// [brief]: Base service for PRPD Infra Operations.
+// [detail]: Provides base infra operations add, delete and get for route purge timer.
+service Base {
+    // [brief]: Configure purge timer for the client.
+    // [detail]: Configure a purge timer for the client so that server
+    // side will retain the client installed routes till this time after
+    // client disconnects and provide sufficient time for the client to
+    // reconnect if possible. The default purge timer is 120 seconds.
+    // The valid purge timer range is between 1 and 1000 seconds.
+    rpc RoutePurgeTimerAdd (RoutePurgeTimerAddRequest) returns (RoutePurgeTimerAddResponse) {}
+
+    // [brief]: Delete the purge timer for the client.
+    // [detail]: Delete a previously configured purge timer for the client.
+    rpc RoutePurgeTimerDelete (RoutePurgeTimerDeleteRequest) returns (RoutePurgeTimerDeleteResponse) {}
+
+    // [brief]: Retrieve the purge timer for the client.
+    // [detail]: Retrieve the purge timer for the client.
+    rpc RoutePurgeTimerGet (RoutePurgeTimerGetRequest) returns (RoutePurgeTimerGetResponse) {}
+
+    // [brief]: Retrieve the route summary for the client.
+    // [detail]: Retrieve the route summary for the client.
+    rpc RouteSummaryGet (RtSummaryGetRequest) returns (RtSummaryGetResponse) {}
+}
+
+// [brief]: response status code used by sub-code.
+// [detail]: response status code used by sub-code.
+// [default]: SUCCESS.
+enum StatusCode {
+    // [brief]: Success.
+    SUCCESS        = 0;
+    // [brief]: Invalid parameters.
+    INVALID_PARAMS = 1;
+    // [brief]: Invalid address family.
+    INVALID_ADDRESS_FAMILY = 2;
+    // [brief]: Invalid routing instance name.
+    INVALID_INSTANCE = 3;
+}
+
+// [brief]: Route purge timer add request message.
+// [detail]: Route purge timer add request message to set purge timer
+// for the client.
+message RoutePurgeTimerAddRequest {
+    // [brief]: Purge time to be configured for the client.
+    // [detail]: The default purge timer is 120 seconds.
+    // [range]: 1:1000
+    uint32      time     = 1;
+}
+
+// [brief]: Route purge timer get request message.
+// [detail]: Route purge timer get request message.
+message RoutePurgeTimerGetRequest {
+}
+
+// [brief]: Route purge timer delete request message.
+// [detail]: Route purge timer delete request message to delete.
+// purge timer for the client.
+message RoutePurgeTimerDeleteRequest {
+}
+
+// [brief]: Route purge timer add response message.
+// [detail]: Response message for the purget timer add request.
+message RoutePurgeTimerAddResponse {
+    //[brief]: Purge Timer add response status.
+    jnx.jet.common.RpcStatus status  = 1;
+    //[brief]: Purge Timer add response sub_code.
+    StatusCode sub_code       = 2;
+}
+
+// [brief]: Route purge timer delete response message.
+// [detail]: Route purge timer delete response message.
+message RoutePurgeTimerDeleteResponse {
+    // [brief]: Purge Timer delete response status.
+    jnx.jet.common.RpcStatus status = 1;
+    // [brief]: Purge Timer delete response sub_code.
+    StatusCode sub_code      = 2;
+}
+
+// [brief]: Route purge timer get response message to get purge timer.
+// [detail]: Route purge timer get response message to get purge timer for
+// the client.
+message RoutePurgeTimerGetResponse {
+    // [brief]: Purge Timer get response status.
+    jnx.jet.common.RpcStatus status = 1;
+    // [brief]: Purge Timer get response sub_code.
+    StatusCode sub_code      = 2;
+    // [brief]: Purge time in seconds configured for the client.
+    // [range]: 1:1000
+    uint32 time              = 3;
+}
+
+// [brief]: Get Route count based on the matching fields in the RtSummaryGetRequest message
+// [detail]: If the address family and instance names are specified then route summary
+// for <instance>.<addr_family>.0 table eg: vpn1.inet.0 are fetched
+// If the address family is not specified but the instance name is valid then fetch the route summary
+// for <instance>.inet.0 and <instance>.inet6.0 or any other table belonging to that instance.
+// If the address family is specified but the instance name is set to default (empty string)
+// the route summary for <addr_family>.0 from all the instances are fetched.
+// If the address family is not specified and the instance name is set to default (empty string) then            // stats for all the address families belonging to all the instances are fetched.
+// If the instance name is set to "master" then stats for all address families in the master instance
+// is fetched.
+// If any fields are not specified explicitly, default values corresponding to the data type will be set   //according to proto3 documentation.
+//
+message RtSummaryGetRequest {
+
+    // [brief]: Address family  based filter
+    // [detail]: Filters the RtStatsGetResponse based on address family
+    // Default value of 0 returns all the address families
+    // [default_value]: 0
+    // OPTIONAL
+    NetworkAddressFamily addr_family = 1;
+
+    // [brief]: Routing instance based filter
+    // [detail]: Filters the RtSummaryGetResponse based on routing-instance
+    // Default value of "" returns all the routing-instances
+    // [default_value]: ""
+    // OPTIONAL
+    string instance_name = 2;
+
+    // [brief]: Route summary for all clients
+    // [detail]: If this value is TRUE, route-summary is returned for all clients
+    // Default value of FALSE returns route-summary only for this client
+    // [default_value]: FALSE
+    // OPTIONAL
+    bool all_clients = 3;
+}
+
+// [brief]: Route summary get response message to get route summary of the client.
+// [detail]: Route summary get response message to get route summary of the client.
+message RtSummaryGetResponse {
+    // [brief]: Route Summary get response status.
+    jnx.jet.common.RpcStatus status = 1;
+    // [brief]: Route Summary get response sub_code.
+    StatusCode sub_code = 2;
+    // [brief]: Client route summary is a per-client map.
+    // [detail]: key is client name string
+    map<string, ClientRtSummary> client_rt_summary = 3;
+}
+
+// [brief]: Client Route summary.
+// [detail]: Client Route summary contains map of protocol to Route Summary List.
+message ClientRtSummary {
+    // [brief]: Route Summary info per-proto map.
+    // [detail]: key is protocol string like "Static" or "Bgp-Static"
+    map<string, RtSummaryList> protocol_rt_summary = 1;
+}
+
+// [brief]: Route Summary List.
+// [detail]: Route Summary List containing route counts of multiple tables.
+message RtSummaryList {
+   // [brief]: List of route summary entries
+    repeated RtSummaryEntry rt_summary = 1;
+}
+
+// [brief]: Route Summary entry.
+// [detail]: Per-table route count summary.
+message RtSummaryEntry {
+   // [brief]: Name of the route table for which the route-summary is requested.
+    RouteTableName rt_tbl_name = 1;
+    // [brief]: Primary route count.
+    uint32 primary_rt_count = 2;
+    // [brief]: Secondary route count (leaked routes).
+    uint32 secondary_rt_count = 3;
+}

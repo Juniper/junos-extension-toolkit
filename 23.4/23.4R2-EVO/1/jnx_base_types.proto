@@ -1,0 +1,68 @@
+/*
+ * $Id$
+ *
+ * Copyright (c) 2017, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+package jnxBase;
+
+import "google/protobuf/descriptor.proto";
+
+/**
+ * Junos API version string. This string follows the semver
+ * format (https://semver.org/). This option should be included in every
+ * .japi file reflecting the stable version of the component it represents.
+ */
+extend google.protobuf.FileOptions {
+    string japi_version = 50000;
+}
+
+/**
+ * Global status codes to be returned in response messages.
+ * Per-RPC specific status/error codes are to be conveyed
+ * in sub-codes defined in respective API definitions.
+ */
+enum StatusCode {
+    /** Indicates that the RPC executed without error */
+    SUCCESS = 0;
+    /** Indicates a failure condition that should be treated as fatal */
+    FAILURE = 1;
+}
+
+/**
+ * Message containing an associated key value
+ * pair
+ */
+message StrKeyStrVal  {
+    string key = 1;
+    string value = 2;
+}
+
+/**
+ * Message representing timeval structure
+ */
+message TimeVal {
+    uint64 seconds = 1;
+    uint64 microseconds = 2;
+}
+
+/**
+ * RPC execution status information
+ */
+message RpcStatus {
+    /**
+     * Numerical code indicating success or failure of an RPC
+     */
+    StatusCode code = 1;
+
+    /**
+     * Informational message string usually used to convey reason for the
+     * RPC failure
+     */
+    string message = 2;
+}
+
+

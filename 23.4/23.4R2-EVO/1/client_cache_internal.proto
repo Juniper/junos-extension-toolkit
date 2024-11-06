@@ -1,0 +1,107 @@
+// [detail]: This file hosts service related to client cache.
+// It stores the details of the clients connected to nginx and
+// provides APIs to add/delete client and query if a client is
+// authenticated by checking its presence in the cache.
+syntax = "proto3";
+package client_cache;
+
+// [brief]: Service to client cache APIs
+// [detail]: Service to client cache APIs required for nginx to maintain the details of the clients connected
+service ClientCache {
+
+    // [brief]: Add client API
+    // [detail]: This RPC adds client information to the cache
+    rpc AddClient (AddClientRequest) returns (AddClientResponse) {}
+
+    // [brief]: Delete client API
+    // [detail]: This RPC deletes client information from the cache
+    rpc DelClient (DelClientRequest) returns (DelClientResponse) {}
+
+    // [brief]: Query API to check if client is authenticated
+    // [detail]: This RPC checks if a client is authenticated by checking its presence in the cache
+    rpc IsAuthenticated (IsAuthenticatedRequest) returns (IsAuthenticatedResponse) {}
+
+    // [brief]: Get client information API
+    // [detail]: This RPC gets the client information from the cache
+    rpc GetClientInfo (GetClientInfoRequest) returns (GetClientInfoResponse) {}
+}
+
+// [brief]: Request message for AddClient RPC
+message AddClientRequest {
+    string endpoint = 1;
+    string client_id = 2;
+    string lusername = 3;
+    string group_id = 4;
+}
+
+// [brief]: Response message for AddClient RPC
+message AddClientResponse {
+    bool ok = 1;
+}
+
+// [brief]: Request message for DelClient RPC
+message DelClientRequest {
+    string endpoint = 1;
+    string client_id = 2;
+}
+
+// [brief]: Response message for DelClient RPC
+message DelClientResponse {
+    bool ok = 1;
+}
+
+// [brief]: Request message for IsAuthenticated RPC
+message IsAuthenticatedRequest {
+    string endpoint = 1;
+}
+
+// [brief]: Response message for IsAuthenticated RPC
+message IsAuthenticatedResponse {
+    bool ok = 1;
+    string client_id = 2;
+    string group_id = 3;
+}
+
+// [brief]: Request message for GetClientInfo RPC
+message GetClientInfoRequest {
+    // empty for now
+}
+
+// [brief]: Details of the channel created by the client
+message ChannelDetails {
+    // channel target
+    string target = 1;
+
+    // channel status
+    string status = 2;
+}
+
+// [brief]: Details of the client stored in the cache
+message ClientDetails {
+    // endpoint details of the client
+    string endpoint = 1;
+
+    // client id
+    string client_id = 2;
+
+    // group_id
+    string group_id = 3;
+
+    // peer string
+    string peer_str = 4;
+
+    // localname
+    string local_name = 5;
+
+    // login time
+    int64 login_time = 6;
+
+
+    // channel details
+    repeated ChannelDetails ch_details = 7;
+}
+
+// [brief]: Response message for the GetClientInfo RPC
+message GetClientInfoResponse {
+    repeated ClientDetails cl_details = 1;
+}
