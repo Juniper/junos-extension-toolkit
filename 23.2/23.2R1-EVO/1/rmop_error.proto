@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package rmop;
+
+message Empty {}
+
+enum ErrorCode {
+    NONE                = 0;
+    INVALID             = 1;
+    EXIST               = 2;
+    NOENT               = 3;
+    FAILURE             = 4;
+    INVALID_MSG         = 5;
+    INVALID_ARG         = 6;
+}
+
+message Error {
+    ErrorCode code          = 1;
+}

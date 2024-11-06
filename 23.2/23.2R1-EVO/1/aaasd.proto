@@ -1,0 +1,81 @@
+
+syntax = "proto3";
+
+package aaa;
+
+// The AAA service is a collection of RPCs for authentication, authorization
+// and accounting of gRPC RPCs.
+service AAA {
+
+    // authentication rpc validates username and password and
+    // returns success or failure
+    rpc authentication(AuthenticationRequest)
+	returns (AuthenticationResponse) {}
+
+    // authorization rpc validates whether the user has required permissions
+    // to execute rpc
+    rpc authorization(AuthorizationRequest)
+	returns (AuthorizationResponse) {}
+
+    // accounting rpc is for sending user login details
+    rpc accounting_login(AccountingRequest)
+	returns (AccountingResponse) {}
+
+    // accounting rpc is for sending user logout details
+    rpc accounting_logout(AccountingRequest)
+	returns (AccountingResponse) {}
+
+    // accounting rpc is for sending accounting details to radius
+    // or tacplus server after the rpc is executed successfully
+    rpc accounting_rpc(AccountingRequest)
+	returns (AccountingResponse) {}
+}
+
+enum AccoutingLogOutCause {
+    AAA_ACCOUNTING_LOGOUT_NONE = 0;
+    AAA_ACCOUNTING_LOGOUT_USER_REQ = 1;
+    AAA_ACCOUNTING_LOGOUT_REMOTE_END_CLOSED = 2;
+    AAA_ACCOUNTING_LOGOUT_INVALID_VERSION = 3;
+    AAA_ACCOUNTING_LOGOUT_INVALID_MSG = 4;
+    AAA_ACCOUNTING_LOGOUT_NO_DATA = 5;
+}
+
+// AuthenticationRequest specifies the username and password to be validated
+message AuthenticationRequest {
+    string username = 1;
+    string password = 2;
+}
+
+// AuthenticationResponse returns response as success or failure
+message AuthenticationResponse {
+    bool result = 1;
+    string lusername = 2;
+}
+
+// AuthorizationRequest specifies username and rpc to check the permissions
+message AuthorizationRequest {
+    string username = 1;
+    string rpc = 2;
+}
+
+// AuthorizationResponse returns response as success or failure
+message AuthorizationResponse {
+    bool result = 1;
+}
+
+// AccountingRequest specifies username and rpc to be accounted
+message AccountingRequest {
+    string username = 1;
+    string remote_host = 2;
+    uint32 remote_port = 3;
+    AccoutingLogOutCause logout_cause = 4;
+    uint64 logout_sesstime = 5;
+    string rpc = 6;
+}
+
+// AccountingResponse returns whether the accounting request is handled
+// successfully or not through success or failure
+message AccountingResponse {
+    bool result = 1;
+}
+

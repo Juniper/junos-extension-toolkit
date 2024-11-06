@@ -1,0 +1,72 @@
+//
+// Copyright 2018-2019, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This service provides access to low level infrastructure
+// elements of the EVO system. It provides the following services
+// 1. List all the topics of information in the EVO system
+// 2. Subscribe to many or all topics to fetch the information
+// 3. Fetch the underlying schema of the EVO object model
+// 4. Fetch internal application data
+
+syntax = "proto3";
+
+package jnx.jet.dds;
+
+import "jnx_dds_types.proto";
+
+// [brief]: DDS RPC service
+// [detail]: DDS (Distribution Data Service) is a distributed data
+// store which provides all the operational state of the system in
+// the form of objects. DDS RPC service provides a mechanism for
+// clients to view the system's object schema model, get a list of
+// available topics of data and to subscribe to a stream of objects
+// for a given one or more topics.
+service DDS
+{
+    // [brief]: API to get the object hierarchy model
+    // [detail]: Returns the schema definition for all
+    // the types of objects in the system. It includes
+    // the attribute details and the inter object
+    // relationships.
+    rpc SchemaModelGet (SchemaModelRequest) returns (SchemaModelResponse) {}
+
+    // [brief]: API to get the object type documentation
+    // [detail]: Returns the additional technical information
+    // for a given type of object. The information returned
+    // will be a high level, human readable description of
+    // of the type.
+    rpc TypeDocumentationGet (TypeDocumentationRequest) returns (TypeDocumentationResponse) {}
+
+    // [brief]: API to get the list of subscribe topics
+    // [detail]: Topics are labels which are associated
+    // with objects. Clients can subscribe to one more
+    // topic(s) to recieve a stream of associated objects.
+    rpc TopicListGet (TopicListRequest) returns (TopicListResponse) {}
+
+    // [brief]: API to subscribe for a set of topics
+    // [detail]: Returns a stream of objects associated
+    // for a given one or more topic(s). Clients can
+    // build the system state of interest based on these
+    // objects. The stream of objects are continously synced
+    // based on the option given in the request.
+    rpc TopicSubscribe (TopicSubscribeRequest) returns (stream ObjectStreamResponse) {}
+
+    // [brief]: API to fetch application data
+    // [detail]: API to fetch data from a specific application
+    // and a node. This set of data includes certain stats,
+    // telemetry and other CLI data.
+    rpc ApplicationDataGet (ApplicationDataRequest) returns (stream DataStreamResponse) {}
+}
