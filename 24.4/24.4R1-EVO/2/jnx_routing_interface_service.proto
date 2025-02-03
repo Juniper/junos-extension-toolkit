@@ -1,0 +1,387 @@
+// copyright (c) 2019, Juniper Networks, Inc.
+// All rights reserved.
+// This IDL defines the APIs for the routing interfaces service.
+// The APIs are used to receive routing interface events and
+// query routing interfaces on a router.
+
+syntax = "proto3";
+
+// [brief]: This package supports the routing interface services.
+package jnx.jet.routing.interfaces;
+
+// [version]: 0.1.0
+import "jnx_common_addr_types.proto";
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+// [version]: 0.0.0
+import "jnx_routing_base_types.proto";
+
+//[changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+option (jnx.jet.common.junos_release) = "19.3";
+
+// [brief]: Routing interface status.
+// [detail]: Routing interface status like
+// CHANGED, UP, DOWN, and DELETED applicable
+// to InterfaceSubscribeResponse.
+// UP and DOWN are applicable to InterfaceGetResponse.
+// [default]: RT_INTF_CHANGED.
+enum InterfaceStatus {
+
+    // [brief]: Attribute changed.
+    RT_INTF_CHANGED = 0;
+
+    // [brief]: Interface Up.
+    RT_INTF_UP      = 1;
+
+    // [brief]: Interface Down.
+    RT_INTF_DOWN    = 2;
+
+    // [brief]: Interface Deleted.
+    RT_INTF_DELETED = 3;
+}
+
+// [brief]: Routing interface Address.
+// [detail]: The network address linked to the interface.
+message InterfaceAddress {
+
+    // [brief]: IPv4 or IPv6 address of the interface.
+    // [mandatory]:
+    jnx.jet.routing.base.NetworkAddress address = 1;
+
+    // [brief]: Prefix length of the address.
+    // [mandatory]:
+    uint32 prefix_length              = 2;
+
+    // [brief]: Indicates whether this is the primary
+    // IP adddress of the interface.
+    // [mandatory]:
+    bool is_primary                   = 3;
+}
+
+
+// [brief]: Routing interface entry.
+// [detail]: This entry contains the information of a
+// routing interface. It is used by
+// InterfaceSubscribeResponse and
+// InterfaceGetResponse.
+//
+// In a InterfaceSubscribeResponse
+// notifying of a CHANGED or UP status, and in a
+// InterfaceGetResponse, all attributes are
+// applicable.
+//
+// In a InterfaceSubscribeResponse
+// notifying of a DOWN or DELETED status, only the
+// name and status attributes are applicable.
+message InterfaceEntry {
+
+    // [brief]: Name in the format of type-fpc/pic/port.logical.
+    // [mandatory]:
+    string name              = 1;
+
+    // [brief]: Interface index.
+    // [default_value]: 0
+    uint32 index             = 2;
+
+    // [brief]: interface status.
+    // [mandatory]:
+    InterfaceStatus status   = 3;
+
+    // [brief]: Bandwidth in bps.
+    // [default_value]: 0
+    uint64 bandwidth         = 4;
+
+    // [brief]: Maximum transmission unit.
+    // [default_value]: 0
+    uint32 mtu               = 5;
+
+    // [brief]: Interface Addresses.
+    // There may be none, one or multiple addresses.
+    // [default_value]: 0
+    repeated InterfaceAddress addresses = 6;
+}
+
+// [brief]: Routing interface service initialize request.
+// [detail]: A client sends this request to initialize the service.
+message InterfaceInitializeRequest {
+}
+
+// [brief]: Routing interface service initialize response.
+// [detail]: Routing interface service initialize response.
+message InterfaceInitializeResponse {
+
+    // [brief]: Response status.
+    // [detail]: Response status code for interface initialization.
+    // [default]: SUCCESS_COMPLETED.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed.
+        SUCCESS_COMPLETED                   = 0;
+
+        // [brief]: Request successfully completed, with
+        // a preexisting client of the same client
+        // identifier being rebound.
+        SUCCESS_REBOUND                     = 1;
+
+        // [brief]: Request failed due to an internal error.
+        INTERNAL_ERROR                      = 2;
+
+        // [brief]: Service is already initialized.
+        ALREADY_INITIALIZED                 = 3;
+    }
+
+    // [brief]: Top level return code.
+    // [mandatory]:
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The API specific return sub-code for the request.
+    // [mandatory]:
+    StatusCode        sub_code        = 2;
+}
+
+// [brief]: Routing interface get request.
+// [detail]: A client sends this request to query an individual interface.
+message InterfaceGetRequest {
+
+    // [brief]: Key as either the interface name or index of the interface.
+    // [mandatory]:
+    oneof key {
+
+        // [brief]: Interface name.
+        string name  = 1;
+
+        // [brief]: Interface index.
+        uint32 index = 2;
+    }
+
+    // [brief]: The format of IP addresses to be used in response.
+    jnx.jet.common.AddressFormat address_format = 3;
+}
+
+// [brief]: Routing interface get response.
+// [detail]: Response message for get interface request.
+message InterfaceGetResponse {
+
+    // [brief]: Response status.
+    // [detail]: Interface get Response status code.
+    // [default]: SUCCESS_COMPLETED.
+    enum StatusCode {
+
+        // [brief]: Request completed successfully.
+        SUCCESS_COMPLETED       = 0;
+
+        // [brief]: Request failed due to an internal error.
+        INTERNAL_ERROR          = 1;
+
+        // [brief]: Service is not initialized.
+        NOT_INITIALIZED         = 2;
+
+        // [brief]: Interface name and index are invalid.
+        INVALID_INDEX_AND_NAME  = 3;
+
+        // [brief]: Interface was not found.
+        NOT_FOUND               = 4;
+    }
+
+    // [brief]: Top level return code.
+    // [mandatory]:
+    jnx.jet.common.RpcStatus status  = 1;
+
+    // [brief]: The API specific return sub-code for the request.
+    // [mandatory]:
+    StatusCode sub_code              = 2;
+
+    // [brief]: Interface entry.
+    // [detail]: Contains an empty entry in error conditions.
+    InterfaceEntry entry             = 3;
+}
+
+
+// [brief]: Routing interface subscribe request.
+// [detail]: A client sends this request to subscribe for interface
+// event notifications, which will be streamed to the
+// client via InterfaceSubscribeResponses.
+message InterfaceSubscribeRequest {
+
+    // [brief]: The format for IP addresses to be used in response.
+    // [default]: string.
+    jnx.jet.common.AddressFormat address_format = 1;
+}
+
+// [brief]: Routing interface subscribe response.
+// [detail]: Routing interface subscribe response message.
+message InterfaceSubscribeResponse {
+
+    // [brief]: Response status.
+    // [detail]: Response status code.
+    // [default]: SUCCESS_COMPLETED.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed.
+        SUCCESS_COMPLETED   = 0;
+
+        // [brief]: Request failed due to an internal error.
+        INTERNAL_ERROR      = 1;
+
+        // [brief]: Service is not initialized.
+        NOT_INITIALIZED     = 2;
+
+        // [brief]: Notification is already subscribed.
+        ALREADY_SUBSCRIBED  = 3;
+    }
+
+    // [brief]: Top level return code.
+    // [mandatory]:
+    jnx.jet.common.RpcStatus status  = 1;
+
+    // [brief]: The API specific return sub-code for the request.
+    // [mandatory]:
+    StatusCode sub_code              = 2;
+
+    // [brief]: Interface entries.
+    // [detail]: Interface entries May contain 0, 1 or multiple entries.
+    repeated InterfaceEntry entries  = 3;
+}
+
+// [brief]: Routing interface notification unsubscribe request.
+// [detail]: A client sends this request to unsubscribe for interface
+// event notifications.
+message InterfaceUnsubscribeRequest {
+}
+
+// [brief]: Unsubscribe response message.
+// [detail]: Routing interface notification unsubscribe response.
+message InterfaceUnsubscribeResponse {
+
+    // [brief]: Notification unsubscribe response status.
+    // [detail]: Status code for the interface unsubscribe response.
+    // [default]: SUCCESS_COMPLETED.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed.
+        SUCCESS_COMPLETED                   = 0;
+
+        // [brief]: Request failed due to an internal error.
+        INTERNAL_ERROR                      = 1;
+
+        // [brief]: Service is not initialized.
+        NOT_INITIALIZED                     = 2;
+
+        // [brief]: Notification is not subscribed.
+        NOTIFICATION_NOT_SUBSCRIBED         = 3;
+    }
+
+    // [brief]: Top level return code.
+    // [mandatory]:
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The API specific return sub-code for the request.
+    // [mandatory]:
+    StatusCode        sub_code        = 2;
+}
+
+// [brief]: Routing interface notification refresh request.
+// [detail]: A client sends this request to receive a full flash
+// of all interfaces. RoutingInterfaceNotificationResponses
+// carrying the information of all the interfaces will
+// be streamed to the client.
+message InterfaceRefreshRequest {
+}
+
+// [brief]: Routing interface notification refresh response.
+// [detail]: Response message for the interface refresh request.
+message InterfaceRefreshResponse {
+
+    // [brief]: Notification refresh response status.
+    // [detail]: Status code for the interface refresh request.
+    // [default]: SUCCESS_COMPLETED.
+    enum StatusCode {
+
+        // [brief]: Request successfully completed.
+        SUCCESS_COMPLETED                   = 0;
+
+        // [brief]: Request failed due to an internal error.
+        INTERNAL_ERROR                      = 1;
+
+        // [brief]: Service is not initialized.
+        NOT_INITIALIZED                     = 2;
+
+        // [brief]: Notification is not subscribed.
+        NOTIFICATION_NOT_SUBSCRIBED         = 3;
+    }
+
+    // [brief]: Top level return code.
+    // [mandatory]:
+    jnx.jet.common.RpcStatus status   = 1;
+
+    // [brief]: The API specific return sub-code for the request.
+    // [mandatory]:
+    StatusCode        sub_code        = 2;
+}
+
+
+// [brief]: Routing interfaces service.
+// [detail]: JET RPC service providing interface services.
+service Interfaces {
+
+    // [brief]: Service initialize.
+    // [detail]: A client must first use this RPC to initialize and connect
+    // to the service, before issuing other RPCs.
+    rpc InterfaceInitialize (InterfaceInitializeRequest)
+        returns (InterfaceInitializeResponse) {}
+
+    // [brief]: Get a routing interface by name or index.
+    // [detail]: A client may use this RPC to query an individual routing interface
+    // at any time. The client should already know the name or index of
+    // the interface via notification or any other method.
+    rpc InterfaceGet (InterfaceGetRequest)
+        returns (InterfaceGetResponse) {}
+
+    // [brief]: Notification Subscribe.
+    // [detail]: Request to receive asynchronous notifications of
+    // of routing interface CHANGED, UP, DOWN and DELETED
+    // status events.
+    // After a InterfaceSubscribeRequest,
+    // an initial InterfaceSubscribeResponse is sent
+    // immediately to the client, as a confirmation for the
+    // request. This response may or may not carry an interface.
+    //
+    // Then, InterfaceSubscribeResponses are
+    // sent to the client, as a full flash of all the interfaces.
+    //
+    // Subsequently, a InterfaceSubscribeResponse
+    // will be sent to the client upon a CHANGED, UP, DOWN,
+    // or DELETED status event of an interface.
+    // Notification compression:
+    // When a status event of an interface is pending for a client
+    // to be notified of, a new status event happens.
+    // As a net result, a single notification representing the
+    // latest status and attributes of the interface is sent to
+    // the client. This should only happen when consecutive events
+    // happen with extremely small intervals. Examples:
+    // [1] When a CHANGED event is pending, an UP/DOWN
+    // event happens. Hence, an UP/DOWN notification
+    // is sent.
+    // [2] When a CHANGED/UP/DOWN event is pending, a DELETED
+    // event happens. Hence, a DELETED notification
+    // is sent.
+    // [3] When an UP/DOWN event if pending, a CHANGED
+    // event happens. Hence, only an UP/DOWN notification
+    // is sent.
+    rpc InterfaceSubscribe (InterfaceSubscribeRequest)
+        returns (stream InterfaceSubscribeResponse) {}
+
+    // [brief]: Notification unsubscribe.
+    // [detail]: Request to stop receiving notifications
+    // of routing interface events.
+    rpc InterfaceUnsubscribe (InterfaceUnsubscribeRequest)
+        returns (InterfaceUnsubscribeResponse) {}
+
+    // [brief]: Notification refresh.
+    // [detail]: Request to receive a refresh of notifications
+    // of all routing interfaces, with their current status and attributes.
+    rpc InterfaceRefresh (InterfaceRefreshRequest)
+        returns (InterfaceRefreshResponse) {}
+}
+
