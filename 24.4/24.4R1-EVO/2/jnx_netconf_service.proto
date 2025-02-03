@@ -1,0 +1,162 @@
+//
+// Copyright 2022, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file hosts services related to JUNOS Device management using netconf over outbound https
+// Using this, user is able to open a netconf or csh session remotely over htpps instead of traditional ssh
+// The gRPC client will run on the junos box and the gRPC server on the NMS like MIST/CSO/Healthbot
+// It is outbound as box initiates the connection instead of NMS
+// It provides APIs to:
+// NcgrpcInitialize - Intialize the connection to the gRPC server
+// NcgrpcCommandGet - send netconf/csh commands and receive replies
+// NcgrpcServerStatusGet - To get the status of the server
+
+syntax = "proto3";
+
+// [brief]: This is part of the management.ncgrpc package.
+package jnx.jet.netconf;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "20.3";
+
+// [brief]: NCGRPC Service Definitions
+// [detail]: NCGRPC Service Definitions
+service Ncgrpc {
+    // [brief]: It gets the command which needs to be run on box
+    // [detail]: Here gRPC server runs on the NMS, gRPC client on box
+    rpc NcgrpcCommandGet (stream NcgrpcCommandGetRequest) returns
+    (stream NcgrpcCommandGetResponse) {}
+
+    // [brief]: It initiliazes the connection by sharing device ID and shared secret
+    // [detail]: It initiliazes the connection by sharing device ID and shared secret
+    rpc NcgrpcInitialize (NcgrpcInitializeRequest) returns
+    (NcgrpcInitializeResponse) {}
+
+    // [brief]: It gets the gRPC server status
+    // [detail]: It gets the gRPC server status
+    rpc NcgrpcServerStatusGet (NcgrpcServerStatusGetRequest) returns
+    (NcgrpcServerStatusGetResponse) {}
+
+}
+
+// Note: The trailing metadata for NcgrpcInitialize RPC is same as the
+// invocation metadata of the NcgrpcCommandGet RPC, This feature can be leveraged
+// while designing the server
+
+// [brief]: Input format type for NcgrpcServerStatusGetRequest req
+// [detail]: Input format type for NcgrpcServerStatusGetRequest req
+// [default]: REQ_RUNNING
+enum StatusRequest {
+
+    // [brief]: Request for server running status
+    REQ_RUNNING = 0;
+}
+
+// [brief]: Output format type for NcgrpcServerStatusGetRequest status
+// [detail]: Output format type for NcgrpcServerStatusGetRequest status
+// [default]: FAILURE
+enum StatusResponse {
+
+    // [brief]: Server is not running
+    FAILURE = 0;
+
+    // [brief]: Server is running, return 1
+    SUCCESS = 1;
+}
+
+// [brief]: Output format type for NcgrpcInitializeResponse session type
+// [detail]: Output format type for NcgrpcInitializeResponse session type
+// [default]: NETCONF
+enum SessionType {
+
+    // [brief]: For NETCONF session
+    NETCONF = 0;
+
+    // [brief]: For CSH session
+    CSH = 1;
+}
+
+// [brief]: Request to get server running status
+// [detail]: Request to get server running status
+message NcgrpcServerStatusGetRequest {
+
+    // [brief]: Use 0 to get server runnning status
+    StatusRequest req = 1;
+}
+
+// [brief]: Response message for server running status
+// [detail]: Response message for server running status
+message NcgrpcServerStatusGetResponse {
+
+    // [brief]: Returns 1 if the server is running and 0 if not running
+    StatusResponse status = 1;
+}
+
+// [brief]: Initialization message between server and client
+// [detail]: Initialization message between server and client
+message NcgrpcInitializeRequest {
+
+    // [brief]: The instance_id corresponding to the gRPC app
+    // If the gRPC app is restarted, instance_id changes
+    uint64 instance_id = 1;
+
+    // [brief]: The device id corresponding to each juniper box
+    string device_id = 2;
+
+    // [brief]: Secret key which is configured by the NMS on device
+    string secret_key = 3;
+}
+
+// [brief]: Response to Initialization message between server and client
+// [detail]: Response to Initialization message between server and client
+message NcgrpcInitializeResponse {
+
+    // [brief]: session type, 0 for netconf or 1 for csh
+    SessionType session_type = 1;
+}
+
+// [brief]: Request to get command from NMS(Server) to excute on box
+// [detail]: And the next grpc request would contain the netconf RPC reply
+// sent through this same message
+message NcgrpcCommandGetRequest {
+
+    // [brief]: Netconf RPC reply/ CSH command output
+    string message  = 1;
+}
+
+// [brief]: Response to get command request
+// [detail]: Response to get command request
+message NcgrpcCommandGetResponse {
+
+    // [brief]: Input Command, netconf_command for netconf commands and
+    // csh_command for csh commands
+    oneof command {
+        // [brief]: Netconf RPC
+        string netconf_command = 1;
+
+        // [brief]: CSH command
+        string csh_command = 2;
+    }
+
+    // [brief]: If signal is not equal to zero, then kill -signal is given to the opened netconf/csh session.
+    // [detail]: It is useful when syslog telemetry rpc is fired and "<>" doesn't work to close the session
+    // then can use signal=2 to close the session. when you do tail -f in csh mode, then also this can be used
+    uint64 kill_signal = 3;
+}

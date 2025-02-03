@@ -1,0 +1,221 @@
+/*
+ * $Id$
+ *
+ * Copyright (c) 2020, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+import "rmop_error.proto";
+import "rmop_pm.proto";
+import "jnx_addr.proto";
+
+package rmop;
+
+/*
+ * TwampControlType
+ *   Twamp client control type
+ */
+enum TwampControlType {
+    LIGHT          = 0;
+    MANAGED        = 1;
+}
+
+/*
+ * TwampControlCfg
+ *   Twamp client control cfg parameters
+ */
+message TwampControlCfg {
+    uint64            id                       = 1;
+    TwampControlType  control_type             = 2;
+    jnxBase.IpAddress target                   = 3;
+    int32             destination_port         = 4;
+    jnxBase.IpAddress source_address           = 5;
+    string            routing_instance         = 6;
+    uint32            test_interval            = 7;
+}
+
+/*
+ * TwampControlCfgError
+ *   Twamp client control cfg add/change errors
+ */
+enum TwampControlCfgError {
+    TCCE_NONE                                  = 0;
+    TCCE_FAILURE                               = 1;
+    TCCE_INVALID_CONTROL_TYPE                  = 2;
+    TCCE_UNKNOWN_CONTROL_ID                    = 3;
+    TCCE_NO_TARGET_ADDRESS                     = 4;
+    TCCE_INVALID_TARGET_ADDRESS                = 5;
+    TCCE_INVALID_SOURCE_ADDRESS                = 6;
+    TCCE_INVALID_DESTINATION_PORT              = 7;
+    TCCE_INVALID_TEST_INTERVAL                 = 8;
+}
+
+/*
+ * TwampControlCfgResult
+ *   Twamp client control cfg add/change result
+ */
+message TwampControlCfgResult {
+    string name                                = 1;
+    uint64 id                                  = 2;
+    TwampControlCfgError error                 = 3;
+}
+
+/*
+ * TwampControl
+ *   Twamp control for which to perform operations
+ */
+message TwampControl {
+    uint64 id                                  = 1;
+}
+
+/*
+ * TwampThresholdCfg
+ *   Thresholds attached to twamp test
+ */
+message TwampThresholdCfg {
+    uint32 egress_time                         = 1;
+    uint32 ingress_time                        = 2;
+    uint32 jitter_egress                       = 3;
+    uint32 jitter_ingress                      = 4;
+    uint32 jitter_rtt                          = 5;
+    uint32 rtt                                 = 6;
+    uint32 successive_loss                     = 7;
+    uint32 total_loss                          = 8;
+}
+
+/*
+ * TwampTestCfg
+ *   Twamp test cfg parameters
+ */
+message TwampTestCfg {
+    uint64 control_id                          = 1;
+    uint64 test_id                             = 2;
+    jnxBase.IpAddress target                   = 3;
+    int32 destination_port                     = 4;
+    jnxBase.IpAddress source_address           = 5;
+    uint32 data_size                           = 6;
+    uint32 ttl                                 = 7;
+    uint32 probe_count                         = 8;
+    uint32 probe_interval                      = 9;
+    int32  history_size                        = 10;
+    TwampThresholdCfg thresholds               = 11;
+
+    // [brief]: test probe forward path
+    PathCfg forward_path                       = 12;
+
+    // [brief]: test probe return path
+    PathCfg return_path                        = 13;
+}
+
+/*
+ * TwampTestCfgError
+ *   Twamp client test cfg add/change errors
+ */
+enum TwampTestCfgError {
+    TTCE_NONE                                  = 0;
+    TTCE_FAILURE                               = 1;
+    TTCE_NO_CONTROL_ID                         = 2;
+    TTCE_UNKNOWN_CONTROL_ID                    = 3;
+    TTCE_UNKNOWN_TEST_ID                       = 4;
+    TTCE_NO_TARGET_ADDRESS                     = 5;
+    TTCE_INVALID_TARGET_ADDRESS                = 6;
+    TTCE_INVALID_SOURCE_ADDRESS                = 7;
+    TTCE_INVALID_DESTINATION_PORT              = 8;
+    TTCE_INVALID_DATA_SIZE                     = 9;
+    TTCE_INVALID_TTL                           = 10;
+    TTCE_INVALID_PROBE_COUNT                   = 11;
+    TTCE_INVALID_PROBE_INTERVAL                = 12;
+
+    // [brief]: invalid forward path configuration
+    TTCE_INVALID_FORWARD_PATH                  = 13;
+
+    // [brief]: invalid return path configuration
+    TTCE_INVALID_RETURN_PATH                   = 14;
+}
+
+/*
+ * TwampTestCfgResult
+ *   Twamp client test cfg add/change result
+ */
+message TwampTestCfgResult {
+    string name                                = 1;
+    string control_name                        = 2;
+    uint64 id                                  = 3;
+    uint64 control_id                          = 4;
+    TwampTestCfgError error                    = 5;
+}
+
+/*
+ * TwampTest
+ *   Twamp test for which to perform operations
+ */
+message TwampTest {
+    uint64 id                                  = 1;
+}
+
+/*
+ * TwampTestStatusNotification
+ *   Test status notification
+ */
+message TwampTestStatusNotification {
+    uint64 test_id                             = 1;
+    bool   passed                              = 2;
+}
+
+/*
+ * TwampMeasurementsNotification
+ *   Measurements notification
+ */
+message TwampMeasurementsNotification {
+    uint64 test_id                             = 1;
+    Measurements measurements                  = 2;
+}
+
+message TwampPmNotifyThresholds {
+    uint32 rtt_min                             = 1;
+    uint32 rtt_max                             = 2;
+    uint32 rtt_avg                             = 3;
+    uint32 egress_delay_min                    = 4;
+    uint32 egress_delay_max                    = 5;
+    uint32 egress_delay_avg                    = 6;
+    uint32 ingress_delay_min                   = 7;
+    uint32 ingress_delay_max                   = 8;
+    uint32 ingress_delay_avg                   = 9;
+    uint32 egress_jitter_min                   = 10;
+    uint32 egress_jitter_max                   = 11;
+    uint32 egress_jitter_avg                   = 12;
+    uint32 ingress_jitter_min                  = 13;
+    uint32 ingress_jitter_max                  = 14;
+    uint32 ingress_jitter_avg                  = 15;
+}
+
+/*
+ * TwampMeasurementsSubscribe
+ *   Subscribe for measurements notifications
+ */
+message TwampMeasurementsSubscribe {
+    uint64 test_id                             = 1;
+    TwampPmNotifyThresholds thresh             = 2;
+    uint32 seconds                             = 3;
+    TwampPmNotifyThresholds periodic_thresh    = 4;
+}
+
+/*
+ * Rmopd TWAMP rpc calls
+ */
+service Twamp {
+    rpc ControlAdd(TwampControlCfg) returns (TwampControlCfgResult) {}
+    rpc ControlDelete(TwampControl) returns (Error) {}
+    rpc ControlStart(TwampControl) returns (Error) {}
+    rpc ControlStop(TwampControl) returns (Error) {}
+    rpc TestAdd(TwampTestCfg) returns (TwampTestCfgResult) {}
+    rpc TestDelete(TwampTest) returns (Error) {}
+    rpc GetMeasurements(TwampTest) returns (Measurements) {}
+    rpc SubscribeTestStatus(TwampTest) returns (Error) {}
+    rpc UnsubscribeTestStatus(TwampTest) returns (Error) {}
+    rpc SubscribeMeasurements(TwampMeasurementsSubscribe) returns (Error) {}
+    rpc UnsubscribeMeasurements(TwampTest) returns (Error) {}
+    rpc TestStatusNotification(Empty) returns (stream TwampTestStatusNotification) {}
+    rpc MeasurementsNotification(Empty) returns (stream TwampMeasurementsNotification) {}
+}
