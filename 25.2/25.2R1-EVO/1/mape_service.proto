@@ -1,0 +1,175 @@
+//
+//  Copyright 2023, Juniper Networks, Inc.
+// Public API for the Mape RPC services.
+//
+// This file defines the APIs for the Junos specific mape services.
+//
+
+syntax = "proto3";
+
+//[brief]: This package gives support for BGP services.
+package mape;
+
+// [version]: 0.0.0
+import "jnx_base_types.proto";
+
+import "jnx_addr.proto";
+
+// [brief]: Filter match IP address
+// [detail]: Filter match IP address
+message MapeIpPrefix {
+
+    // [brief]: address
+    jnxBase.IpAddress addr = 1;
+
+    // [brief]: Prefix length range for IPv4 (0:32) or IPv6 (0:128) addresses
+    // [range]: [0:128]
+    uint32 prefix_length = 2;
+
+}
+
+// [default]: Mape Rule type
+enum MapeRuleType {
+
+    // [brief]: BMR rule type
+    MAPE_RULE_TYPE_BMR = 0;
+
+    // [brief]: FMR rule type
+    MAPE_RULE_TYPE_FMR = 1;
+}
+
+// [default]: Make Rule End User prefix state
+enum MapeEndUserPrefixState {
+
+    // [brief]: End User prefix obtained via CLI
+    MAPE_END_USER_PREFIX_NA = 0;
+
+    // [brief]: End User prefix obtained via DHCP
+    MAPE_END_USER_PREFIX_PENDING =1;
+
+}
+
+// [brief]: The top level Mape Rule
+// [detail]: An Mape Rule which holds Rule information.
+
+message MapeRule {
+
+    // [brief]: Rule name
+    string rule_name = 1;
+
+    // [brief]: Rule Ipv4_prefix
+    MapeIpPrefix rule_ipv4_prefix = 2;
+
+    // [brief]: For Rule Ipv6 prefix
+    MapeIpPrefix rule_ipv6_prefix = 3;
+
+    // [brief]: Rule type
+    MapeRuleType rule_type = 4;
+
+    // [brief]: EA bit length
+    uint32 rule_ea_bit_length = 5;
+
+    // [brief]: Rule PSID offset
+    uint32 rule_psid_offset = 6;
+
+    // [brief]: Rule PSID Length
+    uint32 rule_psid_length = 7;
+
+}
+
+
+// [brief]: Mape Configuration Add message structure
+// [detail]: Mape detailed message input structure used in MapeConfigAdd
+// rpc.
+message MapeConfigAddRequest {
+
+    // [brief]: Domain name
+    string domain_name = 1;
+
+    // [brief]: End User Prefix
+    MapeIpPrefix  end_user_prefix = 2;
+
+    // [brief]: Domain Border Relay(br) Ipv6 Address
+    MapeIpPrefix  br_address = 3;
+
+    // [brief]: End prefix state
+    MapeEndUserPrefixState end_prefix_state = 4;
+
+
+    // [brief]: List of Map-e rules
+    repeated MapeRule mape_rule_list = 5;
+}
+
+// [brief]: MapeConfig response internal status codes
+// [default]: EOK
+enum StatusCode {
+
+    // [brief]: Success
+    EOK = 0;
+
+    // [brief]: Wrong input
+    EINVALID_MESSAGE = 1;
+
+    // [brief]: Server Internal error
+    EINTERNAL = 2;
+
+    // [brief]: Operation not supported
+    EUNSUPPORTED_OP = 3;
+
+    // [brief]: Resource not available at server
+    NO_RESOURCE = 4;
+}
+
+// [brief]: Return/Response values for Mape Config Add Request RPC.
+// [detail]: Return/Response values for Mape Config Add Request RPC.
+message MapeConfigAddResponse {
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnxBase.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+// [brief]: Mape Domain Name Input  used in MapeConfigDelete rpc.
+// [detail]: Mape Domain Name structure used in MapeConfigDelete rpc.
+message MapeConfigDeleteRequest {
+
+    // [brief]: Mape Domain name
+    string domain_name = 1;
+
+}
+
+// [brief]: Return/Response values for Mape Config Delete Request RPC.
+// [detail]: Return/Response values for Maps Config Delete Request RPC.
+message MapeConfigDeleteResponse {
+
+    // [brief]: RPC execution status information
+    // [detail]: RPC execution status.code as SUCCESS or FAILURE.
+    // status.message is a string containing reason for failure
+    jnxBase.RpcStatus status = 1;
+
+    // [brief]: RPC execution internal status code
+    StatusCode sub_code = 2;
+}
+
+//[brief]: Mape services.
+//[detail]: JET RPC service providing MAPE operations to manage MAPE rules.
+service Mape {
+
+
+    // [brief]: This RPC add MAPE Configuration Add onto to Junos device.
+    // [detail]: This RPC is used to add complete Mape Domain and MAPE rules
+    // and returns the response with appropriate status.
+
+    rpc MapeConfigAdd (MapeConfigAddRequest)
+        returns (MapeConfigAddResponse) {}
+
+   // [brief]: This RPC deletes the existing mape Configuration and returns the result.
+   // [detail]: This RPC deletes the existing maps domain and maps rules and returns the result.
+
+    rpc MapeConfigDelete (MapeConfigDeleteRequest)
+        returns (MapeConfigDeleteResponse) {}
+}

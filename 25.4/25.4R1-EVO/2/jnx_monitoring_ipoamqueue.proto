@@ -1,0 +1,432 @@
+//
+// Copyright 2022, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: This package gives support for ipoam queue management in packet
+// forwarding engines.
+package jnx.jet.monitoring.ipoamqueue;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+// [version]: 0.0.0
+import "jnx_common_addr_types.proto";
+
+// [brief]: IPOam queue service.
+// [detail]: JET RPC service providing operations to manage IPOam Queue in
+// packet forwarding engines for higher bandwidth access, and timestamping of
+// incoming packets.
+service IPOamQueue {
+
+    // [brief]: IPOam queue initialization operation.
+    // [detail]: Initialize RPC must be called first before any other RPC
+    // call to the server. This RPC call will initialize IPOam queue resources
+    // for the connected client.
+    //
+    // If the client is already connected then a status indicating that will be
+    // returned, and will have no effect on server side.
+    rpc Initialize(InitializeRequest)
+        returns (InitializeResponse);
+
+    // [brief]: IPOam queue cleanup operation.
+    // [detail]: Cleanup RPC can be called to cleanup all filters added for
+    // IPOam queue initialized for the connected client.
+    //
+    // It is responsibility of the client to cleanup resources when IPOam queue
+    // is not needed anymore, in order to cleanup the state from packet
+    // forwarding engines.
+    rpc Cleanup(CleanupRequest)
+        returns (CleanupResponse);
+
+    // [brief]: Filter add operation.
+    // [detail]: Filter add RPC adds a filter to initialized IPOam queue for the
+    // connected client. The filter is for matching incoming traffic to be
+    // mapped in IPOam queue.
+    //
+    // On success the response will have a filter id for the created filter.
+    rpc FilterAdd(FilterAddRequest)
+        returns (FilterAddResponse);
+
+    // [brief]: Filter delete operation.
+    // [detail]: Filter delete RPC deletes an already created filter from the
+    // connected client.
+    rpc FilterDelete(FilterDeleteRequest)
+        returns (FilterDeleteResponse);
+
+    // [brief]: Statistics get operation.
+    // [detail]: Statistics get RPC returns aggregated IPOam queue statistics
+    // from all packet forwarding engines.
+    rpc StatisticsGet(StatisticsGetRequest)
+        returns (StatisticsGetResponse);
+}
+
+// [brief]: Initialize request message.
+// [detail]: Parameters for IPOam queue initialization rpc operation.
+message InitializeRequest {
+}
+
+// [brief]: Initialize response message.
+// [detail]: Response message to initialize request operation.
+message InitializeResponse {
+
+    // [brief]: Possible status codes for IPOam queue initialization rpc
+    // operation.
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED   = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR      = 1;
+
+        // [brief]: Failed due to previous initialization operation.
+        ALREADY_INITIALIZED = 2;
+
+        // [brief]: Previous clean up work is pending try again later.
+        CLEANUP_PENDING     = 3;
+    }
+
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+}
+
+// [brief]: Cleanup request message.
+// [detail]: Parameters for IPOam queue cleanup rpc operation.
+message CleanupRequest {
+}
+
+// [brief]: Cleanup response message.
+// [detail]: Response message to cleanup request operation.
+message CleanupResponse {
+
+    // [brief]: Possible status codes for IPOam queue cleanup rpc operation.
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED   = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR      = 1;
+
+        // [brief]: Request failed because there was no initialized state to
+        // cleanup.
+        NOT_INITIALIZED     = 2;
+    }
+
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+}
+
+// [brief]: Filter add request message.
+// [detail]: Parameters for filter add rpc operation.
+message FilterAddRequest {
+
+    // [mandatory]:
+    // [brief]: Filter for classifying incoming traffic in IPOam queue.
+    Filter filter         = 1;
+
+    // [brief]: Output interface index for outgoing traffic.
+    // [detail]: Output interface index, if provided, is used to retrieve
+    // routing table id for the IPOam queue filter installed in packet
+    // forwarding engines.
+    uint32 output_ifindex = 2;
+}
+
+// [brief]: Filter add response message.
+// [detail]: Response message to filter add request operation.
+message FilterAddResponse {
+
+    // [brief]: Possible status codes for add rpc operation.
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED             = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR                = 1;
+
+        // [brief]: The IPOam queue service has not been initialized.
+        NOT_INITIALIZED               = 2;
+
+        // [brief]: Filter has not been specified on request.
+        FILTER_NOT_SPECIFIED          = 3;
+
+        // [brief]: Output interface index is invalid.
+        OUTPUT_IFINDEX_INVALID        = 4;
+
+        // [brief]: Filter protocol has not been specified on request.
+        PROTOCOL_NOT_SPECIFIED        = 5;
+
+        // [brief]: Protocol encoded is invalid.
+        PROTOCOL_INVALID              = 6;
+
+        // [brief]: Local address has not been specified on request.
+        LOCAL_ADDRESS_NOT_SPECIFIED   = 7;
+
+        // [brief]: Local address encoded is invalid.
+        LOCAL_ADDRESS_INVALID         = 8;
+
+        // [brief]: Remote address encoded is invalid.
+        REMOTE_ADDRESS_INVALID        = 9;
+
+        // [brief]: Local and remote ip address version mismatch on request.
+        LOCAL_REMOTE_VERSION_MISMATCH = 10;
+
+        // [brief]: Local and remote ip addresses are the smae on request.
+        // [detail]: Same address as local and remote are not allowed as it's
+        // not a valid production case.
+        LOCAL_REMOTE_SAME             = 11;
+
+        // [brief]: Local port has not been specified on request.
+        // [detail]: This status code can be returned in case of TCP or UDP.
+        LOCAL_PORT_NOT_SPECIFIED      = 12;
+
+        // [brief]: Local port is out of range.
+        // [detail]: This status code can be returned in case of TCP or UDP.
+        LOCAL_PORT_OUT_OF_RANGE       = 13;
+
+        // [brief]: Remote port is out of range.
+        // [detail]: This status code can be returned in case of TCP or UDP.
+        REMOTE_PORT_OUT_OF_RANGE      = 14;
+
+        // [brief]: ICMP type has not been specified on request.
+        // [detail]: This status code can be returned in case of ICMP filter.
+        ICMP_TYPE_NOT_SPECIFIED       = 15;
+
+        // [brief]: ICMP type it out of range.
+        // [detail]: This status code can be returned in case of ICMP filter.
+        ICMP_TYPE_OUT_OF_RANGE        = 16;
+    }
+
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+
+    // [brief]: Filter id for the filter installed.
+    // [detail]: Filter id is valid if sub_code is SUCCESS_COMPLETED.
+    uint32 filter_id                = 3;
+}
+
+// [brief]: Filter delete request message.
+// [detail]: Parameters for filter delete rpc operation.
+message FilterDeleteRequest {
+
+    // [mandatory]:
+    // [brief]: Filter id to be deleted.
+    uint32 filter_id = 1;
+}
+
+// [brief]: Filter delete response message.
+// [detail]: Response to filter delete request operation which contains the
+// status of processed request.
+message FilterDeleteResponse {
+
+    // [brief]: Possible status codes for delete rpc operation.
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED       = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR          = 1;
+
+        // [brief]: The IPOam queue service has not been initialized.
+        NOT_INITIALIZED         = 2;
+
+        // [brief]: Filter id has not been specified on request.
+        FILTER_ID_NOT_SPECIFIED = 3;
+
+        // [brief]: Filter id not found.
+        FILTER_NOT_FOUND        = 4;
+    }
+
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+}
+
+// [brief]: Statistics get request message.
+// [detail]: Parameters for statistics get rpc operation.
+message StatisticsGetRequest {
+}
+
+// [brief]: Statistics get response message.
+// [detail]: Response to statistics get request operation which contains the
+// status of processed request.
+message StatisticsGetResponse {
+
+    // [brief]: Possible status codes for delete rpc operation.
+    enum StatusCode {
+
+        // [brief]: Operation completed successfully.
+        SUCCESS_COMPLETED       = 0;
+
+        // [brief]: Request failed due to an internal server error.
+        INTERNAL_ERROR          = 1;
+
+        // [brief]: The IPOam queue service has not been initialized.
+        NOT_INITIALIZED         = 2;
+    }
+
+    // [brief]: RPC execution status information.
+    jnx.jet.common.RpcStatus status = 1;
+
+    // [brief]: Status code returned by the backend service.
+    // [detail]: Sub code is present if status is a SUCCESS.
+    StatusCode sub_code             = 2;
+
+    // [brief]: Statistics for ipoam queue.
+    // [detail]: Statistics are collected and aggregated from all forwarding
+    // engine nodes that support IPOam queue.
+    // It is present when sub_code is SUCCESS_COMPLETED.
+    Statistics stats                = 3;
+
+    // [brief]: Number of forwarding engine nodes.
+    // [detail]: nodes holds the number of forwarding engines that processed the
+    // request for getting IPOam queue statistics.
+    // It is present when sub_code is SUCCESS_COMPLETED.
+    uint32 nodes                    = 4;
+
+    // [brief]: Number of collections.
+    // [detail]: collections holds the number of forwarding engine nodes from
+    // which the statistics have been collected. If collections is not equal to
+    // nodes then it means some forwarding engine nodes do NOT support IPOam
+    // queue.
+    // It is present when sub_code is SUCCESS_COMPLETED.
+    uint32 collections              = 5;
+
+    // [brief]: Number of incompletes.
+    // [detail]: incompletes holds the number of incomplete collections from
+    // forwarding engine nodes. incompletes could be transient when a forwarding
+    // engine node is restarting, or some internal data exchange error.
+    // It is present when sub_code is SUCCESS_COMPLETED.
+    uint32 incompletes              = 6;
+}
+
+// [brief]: Filter message to map traffic to IPOam queue.
+// [detail]: This is the filter installed in packet forwarding engines to
+// classify certain traffic to be mapped in IPOam queue.
+message Filter {
+
+    // [mandatory]:
+    // [brief]: Local address to be matched.
+    jnx.jet.common.IpAddress local_address  = 1;
+
+    // [brief]: Remote address to be matched.
+    jnx.jet.common.IpAddress remote_address = 2;
+
+    // [mandatory]:
+    // [brief]: Protocol layer fields to be matched.
+    Protocol protocol                       = 3;
+}
+
+// [brief]: Filter on protocol information.
+// [detail]: Protocol information to be matched on can be based on TCP, UDP, or
+// ICMP fields.
+message Protocol {
+
+    // [mandatory]:
+    // [brief]: Supported protocols on filter match.
+    oneof proto {
+
+        // [brief]: TCP protocol fields to match.
+        ProtocolTcp tcp   = 1;
+
+        // [brief]: UDP protocol fields to match.
+        ProtocolUdp udp   = 2;
+
+        // [brief]: ICMP protocol fields to match.
+        ProtocolIcmp icmp = 3;
+    }
+}
+
+// [brief]: Filter on TCP.
+// [detail]: TCP protocol fields to be matched from the filter in order to put
+// the traffic in IPOam queue.
+message ProtocolTcp {
+
+    // [mandatory]:
+    // [brief]: Local TCP port to be matched.
+    // [range]: [1:65535]
+    uint32 local_port  = 1;
+
+    // [brief]: Remote TCP port to be matched.
+    // [range]: [1:65535]
+    uint32 remote_port = 2;
+}
+
+// [brief]: Filter on UDP.
+// [detail]: UDP protocol fields to be matched from the filter in order to put
+// the traffic in IPOam queue.
+message ProtocolUdp {
+
+    // [mandatory]:
+    // [brief]: Local UDP port to be matched.
+    // [range]: [1:65535]
+    uint32 local_port  = 1;
+
+    // [brief]: Remote UDP port to be matched.
+    // [range]: [1:65535]
+    uint32 remote_port = 2;
+}
+
+// [brief]: Filter on ICMP.
+// [detail]: ICMP protocol fields to be matched from the filter in order to put
+// the traffic in IPOam queue.
+message ProtocolIcmp {
+
+    // [mandatory]:
+    // [brief]: ICMP type to be matched.
+    // [range]: [0:255]
+    uint32 type = 1;
+}
+
+// [brief]: IPOam queue statistics.
+// [detail]: Aggregated IPOam queue statistics from all forwarding engine nodes.
+message Statistics {
+
+    // [mandatory]:
+    // [brief]: Number of matching packets in IPOam queue.
+    uint64 pkts       = 1;
+
+    // [mandatory]:
+    // [brief]: Number of matching bytes in IPOam queue.
+    uint64 bytes      = 2;
+
+    // [mandatory]:
+    // [brief]: Number of dropped packets in IPOam queue.
+    // [detail]: Packet drops happen when IPOam queue bandwidth policer is
+    // exceeded.
+    uint64 drop_pkts  = 3;
+
+    // [mandatory]:
+    // [brief]: Number of dropped bytes in IPOam queue.
+    uint64 drop_bytes = 4;
+}

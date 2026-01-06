@@ -1,0 +1,305 @@
+/**
+ * Copyright (c) 2018, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+/*
+ * Depends on common JNX and RPD API definitions
+ */
+import "jnx_base_types.proto";
+import "flexible_tunnel_profile.proto";
+
+/**
+ * This is part of the routing package.
+ */
+package routing;
+
+/**
+ * RPC parameters for a request to add one or more flexible tunnel
+ * profiles. The FlexibleTunnelAdd RPC supports bulking of up
+ * to 1000 tunnel profiles per request.
+ */
+message FlexibleTunnelAddRequest {
+
+    /**
+     * List of one or more tunnel profiles to request addition for.
+     * Up to 1000 tunnel profiles may be contained in one request.
+     * REQUIRED.
+     */
+    repeated FlexibleTunnelProfile  tunnel_profiles = 1;
+}
+
+/**
+ * RPC return for a request to add flexible tunnel profiles.
+ */
+message FlexibleTunnelAddResponse {
+
+    /** Return sub_code for FlexibleTunnelAdd responses. */
+    enum StatusCode {
+        /** A new profile was successfully added */
+        SUCCESS                = 0;
+
+        /** An internal error occured */
+        INTERNAL_ERROR         = 1;
+
+        /** The specified profile already exists */
+        ALREADY_EXISTS         = 2;
+
+        /** Request contained too many operations */
+        TOO_MANY_OPS           = 3;
+
+        /** Invalid flexible tunnel profile parameters */
+        INVALID_TUNNEL_PROFILE  = 4;
+
+        /** Invalid flexible tunnel profile action */
+        INVALID_TUNNEL_ACTION  = 5;
+
+        /** Invalid profile name in request */
+        INVALID_PROFILE_NAME   = 6;
+    }
+
+    /** Top level return code */
+    jnxBase.StatusCode         code        = 1;
+
+    /** Detailed return code */
+    StatusCode                 sub_code     = 2;
+
+    /** Textual status message */
+    string                     message     = 3;
+
+    /**
+     * The number of requested operations for which the operation
+     * completed successfully.
+     */
+    uint32 operations_completed            = 4;
+}
+
+/**
+ * RPC parameters for a request to update one or more flexible tunnel
+ * profiles. The FlexibleTunnelUpdate RPC supports bulking of up
+ * to 1000 tunnel profiles per request.
+ */
+message FlexibleTunnelUpdateRequest {
+
+    /**
+     * List of one or more tunnel profiles to request update(s) for.
+     * Up to 1000 tunnel profiles may be contained in one request.
+     * REQUIRED.
+     */
+    repeated FlexibleTunnelProfile  tunnel_profiles = 1;
+}
+
+/**
+ * RPC return for a request to update flexible tunnel profiles.
+ */
+message FlexibleTunnelUpdateResponse {
+
+    /** Return sub_code for FlexibleTunnelUpdate responses. */
+    enum StatusCode {
+        /** A new profile was successfully added or updated */
+        SUCCESS                = 0;
+
+        /** An internal error occured */
+        INTERNAL_ERROR         = 1;
+
+        /** Request contained too many operations */
+        TOO_MANY_OPS           = 2;
+
+        /** Invalid flexible tunnel profile parameters */
+        INVALID_TUNNEL_PROFILE = 3;
+
+        /** Invalid flexible tunnel profile action */
+        INVALID_TUNNEL_ACTION  = 4;
+
+        /** Invalid profile name in request */
+        INVALID_PROFILE_NAME   = 5;
+
+        /** A tunnel with the specified profile already exists */
+        ALREADY_EXISTS         = 6;
+    }
+
+    /** Top level return code */
+    jnxBase.StatusCode         code        = 1;
+
+    /** Detailed return code */
+    StatusCode                 sub_code     = 2;
+
+    /** Textual status message */
+    string                     message     = 3;
+
+    /**
+     * The number of requested operations for which the operation
+     * completed successfully.
+     */
+    uint32 operations_completed            = 4;
+}
+
+/**
+ * RPC parameters for a request to delete one or more flexible tunnel profiles.
+ * RPCs that use the DeleteRequest message support bulking of up to 1000
+ * tunnel profiles per request.
+ */
+message FlexibleTunnelDeleteRequest {
+    /**
+     * List of one or more tunnel profile names to request delete(s) for.
+     * tunnel_profile_name is the unique client-assigned name for the profile
+     * provided at the time the profile was added. The tunnel profiles are
+     * searched by profile name and the tunnels exactly matching the those
+     * named in the request list are deleted.
+     * Up to 1000 tunnel profile may be contained in one request.
+     * REQUIRED.
+     */
+    repeated string tunnel_profile_names = 1;
+}
+
+/**
+ * RPC return for a request to delete a flexible tunnel attribute.
+ */
+message FlexibleTunnelDeleteResponse {
+
+    /** Return sub_code for FlexibleTunnelDelete responses. */
+    enum StatusCode {
+        /** An profile was successfully deleted */
+        SUCCESS         = 0;
+
+        /** An internal error occured */
+        INTERNAL_ERROR         = 1;
+
+        /** The specified profile does not exist */
+        NOT_FOUND              = 2;
+
+        /** Request contained too many operations */
+        TOO_MANY_OPS           = 3;
+
+        /** Invalid profile name in request */
+        INVALID_PROFILE_NAME   = 4;
+    }
+
+    /** Top level return code */
+    jnxBase.StatusCode         code        = 1;
+
+    /** Detailed return code */
+    StatusCode                 sub_code     = 2;
+
+    /** Textual status message */
+    string                     message     = 3;
+
+    /**
+     * The number of requested operations for which the operation
+     * completed successfully.
+     */
+    uint32 operations_completed            = 4;
+}
+
+/**
+ * RPC parameters for a request to query a flexible tunnel profile.
+ */
+message FlexibleTunnelGetRequest {
+    /**
+     * The unique profile name assigned by the client when the profile was
+     * added. The tunnel profiles are searched by profile name and the single
+     * tunnel exactly matching the queried name is returned.
+     * REQUIRED.
+     */
+    string tunnel_profile_name = 1;
+}
+
+/**
+ * RPC return for a request to query a flexible tunnel profile.
+ */
+message FlexibleTunnelGetResponse {
+
+    /** Return sub_code for FlexibleTunnelGet responses. */
+    enum StatusCode {
+        /** The specified profile was returned */
+        SUCCESS                = 0;
+
+        /** An internal error occured */
+        INTERNAL_ERROR         = 1;
+
+        /** The specified profile does not exist */
+        NOT_FOUND              = 2;
+
+        /** Invalid profile name in request */
+        INVALID_PROFILE_NAME   = 3;
+    }
+
+    /** Top level return code */
+    jnxBase.StatusCode         code        = 1;
+
+    /** Detailed return code */
+    StatusCode                 sub_code     = 2;
+
+    /** Textual status message */
+    string                     message     = 3;
+
+    /* The profile returned */
+    FlexibleTunnelProfile        tunnel_profile = 4;
+}
+
+/**
+ * JET RPC service providing operations to manage flexible tunnel profiles
+ * as independent objects decopuled from routes that may use them.
+ */
+service FlexibleTunnel {
+    /**
+     * Request to add new flexible tunnel profiles.
+     * An error will be returned if either a profile with the given name
+     * or a profile with conflicting tunnel attributes already exists.
+     * See the specific tunnel attributes for the description of conflicting
+     * attributes for that tunnel type.
+     *
+     * The request may contain from one to 1000 tunnel profiles.
+     * If the request contains multiple tunnel profiles, the profiles will
+     * be processed in the order given and the first error encountered will
+     * cause the request to abort.
+     * The API always returns the final status (success or first error
+     * encountered) and the number of profiles that were successfully
+     * updated prior to any error or full completion of the request.
+     */
+    rpc FlexibleTunnelAdd (FlexibleTunnelAddRequest)
+        returns (FlexibleTunnelAddResponse) {}
+
+    /**
+     * Request to add new flexible tunnel profiles, or update the profile(s)
+     * if profiles matching the given name already exists. An error will be
+     * returned if a different profile with conflicting tunnel attributes
+     * already exists. See the specific tunnel attributes for the description
+     * of conflicting attributes for that tunnel type..
+     *
+     * The request may contain from one to 1000 tunnel profiles.
+     *
+     * If the request contains multiple tunnel profiles, the profiles will
+     * be processed in the order given and the first error encountered will
+     * cause the request to abort.
+     * The API always returns the final status (success or first error
+     * encountered) and the number of profiles that were successfully
+     * updated prior to any error or full completion of the request.
+     */
+    rpc FlexibleTunnelUpdate (FlexibleTunnelUpdateRequest)
+        returns (FlexibleTunnelUpdateResponse) {}
+
+    /**
+     * Request to delete existing flexible tunnel profiles by name.
+     *
+     * The request may contain from one to 1000 tunnel profiles.
+     *
+     * If the request contains multiple tunnel profiles, the profiles will
+     * be processed in the order given and the first error encountered will
+     * cause the request to abort.
+     * The API always returns the final status (success or first error
+     * encountered) and the number of profiles that were successfully
+     * deleted prior to any error or full completion of the request.
+     */
+    rpc FlexibleTunnelDelete (FlexibleTunnelDeleteRequest)
+        returns (FlexibleTunnelDeleteResponse) {}
+
+    /**
+     * Request to query the paramaters of an existing flexible tunnel
+     * profile with the given name.
+     */
+    rpc FlexibleTunnelGet (FlexibleTunnelGetRequest)
+        returns (FlexibleTunnelGetResponse) {}
+}

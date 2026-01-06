@@ -1,0 +1,174 @@
+/**
+ * $Id$
+ *
+ * Copyright (c) 2016, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+import "prpd_common.proto";
+
+package routing;
+
+/**
+  * ------------------------------------------------------------------
+  * Request message to configure a purge timer for the client
+  * ------------------------------------------------------------------
+  */
+message RtPurgeConfigRequest {
+
+    // Purge time to be configured for the client
+    uint32      time     = 1;
+}
+
+/**
+  * ------------------------------------------------------------------
+  * Generic empty request message
+  * ------------------------------------------------------------------
+  */
+message RtEmptyRequest {
+}
+
+/**
+  * ------------------------------------------------------------------
+  * Reply message to get the return code for a operation performed
+  * ------------------------------------------------------------------
+  */
+message RtOperReply {
+
+    // Return code indicating the success or failure of the operation and in
+    // case of failure, the code will indicate the type of the failure which
+    // occurred.
+    ReturnCode ret_code  = 1;
+}
+
+/**
+  * ------------------------------------------------------------------
+  * Reply message to get purge timer for the client
+  * ------------------------------------------------------------------
+  */
+message RtPurgeTimeGetReply {
+
+    // Return code indicating the success or failure of the operation and in
+    // case of failure, the code will indicate the type of the failure which
+    // occurred.
+    ReturnCode ret_code  = 1;
+
+    // Purge time for the client
+    uint32      time     = 2;
+}
+
+/**
+  * ------------------------------------------------------------------
+  * Get Route count based on the matching fields in the RtSummaryGetRequest message
+  * ------------------------------------------------------------------
+  * If the address family and instance names are specified then route summary
+  * for <instance>.<addr_family>.0 table eg: vpn1.inet.0 are fetched
+  * If the address family is not specified but the instance name is valid then fetch the route summary
+  * for <instance>.inet.0 and <instance>.inet6.0 or any other table belonging to that instance.
+  * If the address family is specified but the instance name is set to default (empty string)
+  * the route summary for <addr_family>.0 from all the instances are fetched.
+  * If the address family is not specified and the instance name is set to default (empty string) then            // stats for all the address families belonging to all the instances are fetched.
+  * If the instance name is set to "master" then stats for all address families in the master instance
+  * is fetched.
+  * If any fields are not specified explicitly, default values corresponding to the data type will be set   //according to proto3 documentation.
+  */
+message RtSummaryGetRequest {
+
+    // [brief]: Address family  based filter
+    // [detail]: Filters the RtStatsGetResponse based on address family
+    // Default value of 0 returns all the address families
+    // [default_value]: 0
+    // OPTIONAL
+    NetworkAddressFamily addr_family = 1;
+
+    // [brief]: Routing instance based filter
+    // [detail]: Filters the RtSummaryGetResponse based on routing-instance
+    // Default value of "" returns all the routing-instances
+    // [default_value]: ""
+    // OPTIONAL
+    string instance_name = 2;
+
+    // [brief]: Route summary for all clients
+    // [detail]: If this value is TRUE, route-summary is returned for all clients
+    // Default value of FALSE returns route-summary only for this client
+    // [default_value]: FALSE
+    // OPTIONAL
+    bool all_clients = 3;
+}
+
+/**
+  * ------------------------------------------------------------------
+  *  Route summary get response message to get route summary of the client.
+  * ------------------------------------------------------------------
+  */
+message RtSummaryGetResponse {
+    // Return code indicating the success or failure of the operation and in
+    // case of failure, the code will indicate the type of the failure which
+    // occurred.
+    ReturnCode ret_code  = 1;
+    // Client route summary is a per-client map.
+    // key is client name
+    map<string, ClientRtSummary> client_rt_summary = 2;
+}
+
+message ClientRtSummary {
+    // Protocol route summary is a per-proto map.
+    // key is protocol string like "Static" or "Bgp-Static"
+    map<string, RtSummaryList> protocol_rt_summary = 1;
+}
+
+/**
+  * ------------------------------------------------------------------
+  *  Route Summary List containing route counts of multiple tables.
+  * ------------------------------------------------------------------
+  */
+message RtSummaryList {
+   // List of route summary entries
+    repeated RtSummaryEntry rt_summary = 1;
+}
+
+/**
+  * ------------------------------------------------------------------
+  *  Per-table route count summary.
+  * ------------------------------------------------------------------
+  */
+message RtSummaryEntry {
+    // Name of the route table for which the route-summary is requested.
+    RouteTableName rt_tbl_name = 1;
+    // Primary route count.
+    uint32 primary_rt_count = 2;
+    // Secondary route count (leaked routes).
+    uint32 secondary_rt_count = 3;
+}
+
+/**
+  * ---------------------------------------------------------------
+  * APIs for the RPD Infra Operations
+  * ---------------------------------------------------------------
+  */
+service Base {
+
+    /**
+     * Configure a purge timer for the client so that server side will retain
+     * the client installed routes till this time after client disconnects and
+     * provide sufficient time for the client to reconnect if possible.
+     */
+    rpc RoutePurgeTimeConfig (RtPurgeConfigRequest) returns (RtOperReply) {}
+
+    /**
+     * Unconfigure a previously configured purge timer for the client.
+     */
+    rpc RoutePurgeTimeUnconfig (RtEmptyRequest) returns (RtOperReply) {}
+
+    /**
+     * Get a purge timer for the client
+     */
+    rpc RoutePurgeTimeGet (RtEmptyRequest) returns (RtPurgeTimeGetReply) {}
+
+    /**
+     * Get route summary for the client
+     */
+    rpc RouteSummaryGet (RtSummaryGetRequest) returns (RtSummaryGetResponse) {}
+}

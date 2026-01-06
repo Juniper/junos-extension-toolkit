@@ -1,0 +1,649 @@
+//
+// Copyright 2018-2019, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+package jnx.jet.dds;
+
+// [brief]: Response status code for a request
+// [detail]: Response status code for a request
+// [default]: SUCCESS
+enum ResponseStatus {
+    // [brief]: Ignore the status
+    // [detail]: Ignore the status
+    IGNORE = 0;
+
+    // [brief]: Request was successful
+    // [detail]: Request was successful
+    SUCCESS = 1;
+
+    // [brief]: Bad input from the user
+    // [detail]: Bad input from the user
+    BAD_INPUT = 2;
+
+    // [brief]: Service side error
+    // [detail]: Service side error
+    SERVER_ERROR = 3;
+}
+
+// [brief]: Status of the subscription stream
+// [detail]: Status of the subscription stream
+// [default]: STATUS_STREAMING
+enum ObjectStreamStatus {
+    // [brief]: Stream still running
+    // [detail]: Stream still running
+    STATUS_STREAMING = 0;
+
+    // [brief]: Maximum subscriptions reached
+    // [detail]: Maximum subscriptions reached
+    ERROR_MAX_SUBSCRIPTIONS = 1;
+
+    // [brief]: Maximum promiscuous subscriptions reached
+    // [detail]: Maximum promiscuous subscriptions reached
+    ERROR_MAX_PROMISCUOUS_SUBSCRIPTIONS = 2;
+
+    // [brief]: Duplicate subscription from the same client
+    // [detail]: Duplicate subscription from the same client
+    ERROR_DUPLICATE_SUBSCRIPTION = 3;
+
+    // [brief]: Maximum topic limit per subscription reached
+    // [detail]: Maximum topic limit per subscription reached
+    ERROR_MAX_SUBSCRIPTION_TOPICS = 4;
+
+    // [brief]: Invalid subscription topic
+    // [detail]: Invalid subscription topic
+    ERROR_INVALID_SUBSCRIPTION_TOPIC = 5;
+
+    // [brief]: Invalid batch size range
+    // [detail]: Invalid batch size range (Allowed 1 - 200)
+    ERROR_INVALID_BATCH_SIZE_RANGE = 6;
+
+    // [brief]: Invalid batch timeout range
+    // [detail]: Invalid batch timeout range (Allowed 1ms - 200ms)
+    ERROR_INVALID_BATCH_TIMEOUT_RANGE = 7;
+
+    // [brief]: End of the subscription stream
+    // [detail]: End of the subscription stream
+    STATUS_END_OF_STREAM = 8;
+}
+
+// [brief]: Fetch type for AppDataRequest
+// [detail]: Fetch type for AppDataRequest
+// [default]: FETCH_ALL
+enum DataFetchType {
+    // [brief]: Fetch all data at once
+    // [detail]: Fetch all data at once
+    FETCH_ALL = 0;
+
+    // [brief]: Fetch first data record
+    // [detail]: Fetch first data record
+    FETCH_FIRST = 1;
+
+    // [brief]: Fetch the next data record
+    // [detail]: Fetch the next data record
+    FETCH_NEXT = 2;
+}
+
+// [brief]: Status of the application data stream
+// [detail]: Status of the application data stream
+// [default]: NO_ERROR
+enum DataStreamStatus {
+    // [brief]: More data pending
+    // [detail]: More data pending
+    DATA_PENDING = 0;
+
+    // [brief]: End of data stream
+    // [detail]: End of data stream
+    DATA_FINISHED = 1;
+
+    // [brief]: Invalid data request
+    // [detail]: Invalid data request
+    ERROR_INVALID_REQUEST = 2;
+
+    // [brief]: Invalid/Missing data requested
+    // [detail]: Invalid/Missing data requested
+    ERROR_DATA_NOT_FOUND = 3;
+
+    // [brief]: Server side stream disconnect/error
+    // [detail]: Server side stream disconnect/error
+    ERROR_STREAM_ERROR = 4;
+}
+
+// [brief]: Response stream options
+// [detail]: Response stream options
+message StreamOptions {
+    // [brief]: Response batch size
+    // [detail]: Batch upto batch_size entries
+    // in the response
+    // [default_value]: 50
+    uint32 batch_size = 1;
+
+    // [brief]: Response batch timeout
+    // [detail]: Timeout in ms to wait for accumilating
+    // entries in response
+    // [default_value]: 50ms
+    uint32 batch_timeout_ms = 2;
+}
+
+// [brief]: Request to obtain schema information.
+// [detail]: Request to obtain schema information.
+message SchemaModelRequest {
+    // [brief]: Identifier sent in request messages.
+    uint64 request_id = 1;
+
+    // [brief]: Forces a rebuild of the schema
+    // [detail]: Forces a rebuild of the schema
+    // from data stored on disk. Typically not
+    // required, but useful after partial upgrade.
+    // [default_value]: false
+    bool rebuild_schema = 2;
+}
+
+// [brief]: Response to schema information request
+// [detail]: For each type of the object defined in the system,
+// all its properties and attributes details are fetched.
+message SchemaModelResponse {
+    // [brief]: Identifier sent in request messages.
+    uint64 response_id = 1;
+
+    // [brief]: response code
+    ResponseStatus response_code = 2;
+
+    // [brief]: response message
+    string response_message = 3;
+
+    // [brief]: Meta description for each field.
+    message FieldDescriptor {
+        // [brief]: Enum/Bitset type information
+        message EnumBitsetDescriptor {
+            // [brief]: Name of the enum field
+            // [detail]: Name of the enum field
+            string name = 1;
+
+            // [brief]: Description of the enum field
+            // [detail]: Description of the enum field
+            string description = 2;
+
+            // [brief]: Ordinal value of the enum field
+            // [detail]: Ordinal value of the enum field
+            uint32 value = 3;
+        }
+
+        // [brief]: Data type of the field
+        string data_type = 1;
+
+        // [brief]: This field can either be singular
+        // value or an array of values.
+        bool is_array = 2;
+
+        // [brief]: If is_array is true, then this
+        // represents the size of the declared array
+        // -1 is for dynamic array
+        uint32 array_len = 3;
+
+        // [brief]: If type is enum, then this lists
+        // all possible enum values
+        repeated EnumBitsetDescriptor enum_type = 4;
+
+        // [brief]: If type is bitset, then this lists
+        // all possible bitset values
+        repeated EnumBitsetDescriptor bitset_type = 5;
+
+        // [brief]: If this is inner type, then this
+        // populates the inner type details
+        map<string, FieldDescriptor> fields = 6;
+    }
+
+    // [brief]: Natural name info for the type
+    message NaturalNameDescriptor {
+        // [brief]: type_guid of the parent
+        // type in hierarchy
+        string parent_type = 1;
+
+        // [brief]: storage_type in the database
+        // [detail]: Internal data
+        string storage_type = 2;
+
+        // [brief]: one or more fields in this
+        // type that make up the natural name
+        repeated string natural_fields = 3;
+    }
+
+    // [detail]: Descriptor for each type of the object in
+    // the system along with all necessary metadata.
+    message TypeDescriptor {
+        // [brief]: Globally unique Hex identifier
+        // for this type, to be used as a key for
+        // lookup purposes.
+        string type_guid = 1;
+
+        // [brief]: Name of the module this type
+        // belongs to. There could be objects of
+        // same type name in different modules.
+        string module_name = 2;
+
+        // [brief]: Package name of this type in
+        // this module. There could be objects of
+        // same type name in differnt packages.
+        string package_name = 3;
+
+        // [brief]: Name of the type of the object.
+        string type_name = 4;
+
+        // [brief]: Object type class
+        ObjectClass type_class = 5;
+
+        // [brief]: Information about each field
+        // and nested fields of this type.
+        map<string, FieldDescriptor> fields = 6;
+
+        // [brief]: Natural names are unique semantic
+        // primary keys for this type of object
+        map<string, NaturalNameDescriptor> natural_names = 7;
+
+        // [brief]: type_guid for other type
+        // descriptors which can be linked from this
+        // type.
+        repeated string links = 8;
+
+        // [brief]: type_guid for other type
+        // descriptors which can be linked to
+        // this type.
+        repeated string children = 9;
+
+        // [brief]: If this type is a bundle
+        // content, then a list of bundle root
+        // link type_guids
+        repeated string bundle_links = 10;
+
+        // [brief]: If this type a bundle root,
+        // then a list of bundle content
+        // type_guids
+        repeated string bundle_contents = 11;
+
+        // [brief]: type_guid for other type
+        // descriptors which can be attached
+        // to this type
+        repeated string attachments = 12;
+
+        // [brief]: type_guid for other type
+        // descriptors, this type can attach
+        // to. This is populated if this type
+        // is of 'attached-object' class.
+        repeated string base_types = 13;
+    }
+
+    // [brief]: Descriptor entry for each type.
+    repeated TypeDescriptor types_descriptors = 4;
+}
+
+// [brief]: Request to obtain type documentation
+// [detail]: Clients can request additional
+// documentation for a given type or a stream of
+// all types.
+message TypeDocumentationRequest {
+    // [brief]: Identifier sent in request messages.
+    uint64 request_id = 1;
+
+    // [brief]: Module name for which the documentation
+    // is requested.
+    string module_name = 2;
+}
+
+// [brief]: Detailed technical information for a given type(s).
+// [detail]: Detailed technical information for a given type(s).
+message TypeDocumentationResponse {
+    // [brief]: Identifier sent in request messages.
+    uint64 response_id = 1;
+
+     // [brief]: response code
+    ResponseStatus response_code = 2;
+
+    // [brief]: response message
+    string response_message = 3;
+
+    // [brief]: Documentation per type
+    message TypeDocumentation {
+        // [brief]: type_guid of the type
+        string type_guid = 1;
+
+        // [brief]: Short single line descrption of the type.
+        string brief = 2;
+
+        // [brief]: Detailed description of the type.
+        string description = 3;
+
+        // [brief]: Reason for deprecation.
+        string deprecated = 4;
+
+        // [brief]: Other resources to look for.
+        string see_also = 5;
+
+        // [brief]: Per field, description based on field name.
+        map<string, string> field_info = 6;
+    }
+
+    // [brief]: List of type documentation for each type
+    // requested.
+    repeated TypeDocumentation type_documentation = 4;
+}
+
+// [brief]: Topic descriptor structure
+// [detail]: Topic descriptor structure
+message TopicDescriptor {
+    // [brief]: Topic string name
+    string topic = 1;
+
+    // [brief]: Scope integer id
+    uint32 scope = 2;
+}
+
+// [brief]: Request to obtain Topic information.
+// [detail]: Request to obtain Topic information.
+message TopicListRequest {
+    // [brief]: Identifier sent in request messages.
+    uint64 request_id = 1;
+
+    // [brief]: Prefix topic.
+    // [optional]: If a prefix topic is provided
+    // all the topics under that hierarchy is returned,
+    // otherwise all topics in the system are returned.
+    // [default_value]: all topics
+    string prefix_topic = 2;
+}
+
+// [brief]: Response with a list of Topics in the system.
+// [detail]: Response with a list of Topics in the system.
+message TopicListResponse {
+
+    // [brief]: Identifier sent in request messages.
+    uint64 response_id = 1;
+
+    // [brief]: response code
+    ResponseStatus response_code = 2;
+
+    // [brief]: response message
+    string response_message = 3;
+
+    // [brief]: Topic desciptors, for a given prefix or
+    // all the topics in the system. Clients can use
+    // the topic string names to subscribe and recieve object
+    // stream.
+    repeated TopicDescriptor topics = 4;
+}
+
+// [brief]: Request to subscribe for a list of topics.
+// [detail]: Request to subscribe for a list of topics.
+message TopicSubscribeRequest {
+    // [brief]: If true, Continuously sync all the
+    // data for the requested topic or end the stream
+    // after syncing current set of data
+    // [default_value]: false
+    bool continuous_sync = 1;
+
+    // [brief]: List of topics to subscribe.
+    // [optional]: Default will subscribe to all topics.
+    // [default_value]: all topics will be subscribed
+    repeated string subscription_topics = 2;
+
+    // [brief]: Response stream options
+    // [optional]: Refer StreamOptions for defaults
+    StreamOptions stream_options = 3;
+}
+
+// [brief]: Descriptor for links of an object
+// [detail]: Descriptor for links of an object
+message LinkDescriptor {
+    // [brief]: Unique identifier for the
+    // link object
+    uint64 link_guid = 1;
+
+    // [brief]: Link index for named link
+    uint32 link_index = 2;
+
+    // [brief]: true if this is a bundle
+    // link to the bundle root
+    bool is_bundled = 3;
+
+    // [brief]: link topic desciptors
+    repeated TopicDescriptor link_topics = 4;
+}
+
+// [brief]: Descriptor for attachments of an object
+// [detail]: Descriptor for attachments of an object
+message AttachmentDescriptor {
+    // [brief]: Unique identifier for the
+    // attachment object
+    uint64 attachment_guid = 1;
+
+    // [brief]: Attachment index for named attaches
+    uint32 attachment_index = 2;
+
+    // [brief]: true if this is a bundle
+    // link to the bundle root
+    bool is_bundled = 3;
+
+    // [brief]: attachment topic descriptors
+    repeated TopicDescriptor attachment_topics = 4;
+}
+
+// [brief]: Operation type enum
+// [default]: OPERATION_UNKNOWN
+enum Operation {
+    // [brief]: Unknown operation
+    // [detail]: Unknown operation
+    OPERATION_UNKNOWN = 0;
+
+    // [brief]: Object add operation
+    // [detail]: Object add operation
+    OPERATION_ADD = 1;
+
+    // [brief]: Object modify operation
+    // [detail]: Object modify operation
+    OPERATION_MODIFY = 2;
+
+    // [brief]: Object add or a modify operation
+    // [detail]: Object add or a modify operation
+    OPERATION_ADD_MODIFY = 3;
+
+    // [brief]: Object delete operation
+    // [detail]: Object delete operation
+    OPERATION_DELETE = 4;
+}
+
+// [brief]: Object class enum
+// [default]: CLASS_OBJECT
+enum ObjectClass {
+    // [brief]: Represents a base object
+    // [detail]: Represents a base object
+    CLASS_OBJECT = 0;
+
+    // [brief]: Represents a first class object
+    // [detail]: Represents a first class object
+    CLASS_FIRST_CLASS_OBJECT = 1;
+
+    // [brief]: Represents an attached object
+    // [detail]: Represents an attached object
+    CLASS_ATTACHED_OBJECT = 2;
+
+    // [brief]: Represents an attached object local to application
+    // [detail]: Represents an attached object local to application
+    CLASS_LOCAL_ATTACHED_OBJECT = 3;
+
+    // [brief]: Represents an attached object by third-party application
+    // [detail]: Represents an attached object by third-party application
+    CLASS_THIRD_PARTY_ATTACHED_OBJECT = 4;
+
+    // [brief]: Represents a bundle object
+    // [detail]: Represents a bundle object
+    CLASS_BUNDLE_OBJECT = 5;
+
+    // [brief]: Represents an internal meta object
+    // [detail]: Represents an internal meta object
+    CLASS_BUNDLE_META_OBJECT = 6;
+}
+
+// [brief]: Stream of descriptors for subscribed objects
+// [detail]: Stream of descriptors for subscribed objects
+message ObjectStreamResponse {
+    // [brief]: status of the object stream
+    ObjectStreamStatus stream_status = 1;
+
+    // [brief]: Batch of objects of size
+    // upto the batch_size entries.
+    repeated ObjectStreamEntry objects = 2;
+}
+
+// [brief]: Entry for one object descriptor
+// [detail]: Entry for one object descriptor
+message ObjectStreamEntry {
+    // [brief]: sync timestamp
+    string timestamp = 1;
+
+    // [brief]: Operation type of this version
+    // of the object
+    Operation operation_type = 2;
+
+    // [brief]: Unique Hex identifier for
+    // the object
+    uint64 object_guid = 3;
+
+    // [brief]: Object logical clock of the
+    // object
+    uint64 object_olc = 4;
+
+    // [brief]: If this is an attach, then
+    // guid of its base object
+    uint64 base_object_guid = 5;
+
+    // [brief]: Type name of this object
+    string object_type = 6;
+
+    // [brief]: Node on which this object
+    // was published
+    string producer_node = 7;
+
+    // [brief]: Name of the application
+    // which published this object
+    string producer_name = 8;
+
+    // [brief]: Unique production id
+    // for the producer application
+    uint32 producer_id = 9;
+
+    // [brief]: Object class
+    ObjectClass object_class = 10;
+
+    // [brief]: Object publish topic descriptors
+    repeated TopicDescriptor object_topics = 11;
+
+    // [brief]: Metadata of links
+    repeated LinkDescriptor links = 12;
+
+    // [brief]: Metadata of attachments
+    repeated AttachmentDescriptor attachments = 13;
+
+    // [brief]: Object attribute fields
+    // in serialized JSON format
+    bytes attributes = 14;
+}
+
+// [brief]: Generic value
+// [detail]: Generic value
+message GenericValue {
+    oneof Value {
+        // [brief]: Numeric value
+        double numeric_value = 1;
+
+        // [brief]: String value
+        string string_value = 2;
+
+        // [brief]: Boolean value
+        bool bool_value = 3;
+    }
+}
+
+// [brief]: Request to fetch application data
+// [detail]: Request to fetch application data
+message ApplicationDataRequest {
+    // [brief]: Application data path
+    // [detail]: Valid data paths are available
+    // via Advertisement DDS subscription
+    // [mandatory]: Must include the data path
+    string data_path = 1;
+
+    // [brief]: Indicate how to fetch the data
+    // [note]: Not yet implemented
+    DataFetchType fetch_type = 2;
+
+    // [brief]: Optional arguments to the data request.
+    // Read as a map of <key,value> pairs. Expects a string
+    // key and either a string, numeric or a boolean value
+    map<string, GenericValue> arguments = 4;
+}
+
+message DataStreamResponse {
+    // [brief]: Data stream status
+    DataStreamStatus stream_status = 1;
+
+    // [brief]: Array of application data
+    // output stream contents in serialized JSON format
+    bytes stream_data = 2;
+}
+
+// [brief]: DDS RPC service
+// [detail]: DDS (Distribution Data Service) is a distributed data
+// store which provides all the operational state of the system in
+// the form of objects. DDS RPC service provides a mechanism for
+// clients to view the system's object schema model, get a list of
+// available topics of data and to subscribe to a stream of objects
+// for a given one or more topics.
+service DDS
+{
+    // [brief]: API to get the object hierarchy model
+    // [detail]: Returns the schema definition for all
+    // the types of objects in the system. It includes
+    // the attribute details and the inter object
+    // relationships.
+    rpc SchemaModelGet (SchemaModelRequest) returns (SchemaModelResponse) {}
+
+    // [brief]: API to get the object type documentation
+    // [detail]: Returns the additional technical information
+    // for a given type of object. The information returned
+    // will be a high level, human readable description of
+    // of the type.
+    rpc TypeDocumentationGet (TypeDocumentationRequest) returns (TypeDocumentationResponse) {}
+
+    // [brief]: API to get the list of subscribe topics
+    // [detail]: Topics are labels which are associated
+    // with objects. Clients can subscribe to one more
+    // topic(s) to recieve a stream of associated objects.
+    rpc TopicListGet (TopicListRequest) returns (TopicListResponse) {}
+
+    // [brief]: API to subscribe for a set of topics
+    // [detail]: Returns a stream of objects associated
+    // for a given one or more topic(s). Clients can
+    // build the system state of interest based on these
+    // objects. The stream of objects are continously synced
+    // based on the option given in the request.
+    rpc TopicSubscribe (TopicSubscribeRequest) returns (stream ObjectStreamResponse) {}
+
+    // [brief]: API to fetch application data
+    // [detail]: API to fetch data from a specific application
+    // and a node. This set of data includes certain stats,
+    // telemetry and other CLI data.
+    rpc ApplicationDataGet (ApplicationDataRequest) returns (stream DataStreamResponse) {}
+}

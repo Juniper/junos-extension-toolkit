@@ -1,0 +1,62 @@
+//
+// Copyright 2021, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file provides an RPC for Authentication
+
+syntax = "proto3";
+
+package jnx.jet.authentication;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Addition of Group ID
+option (jnx.jet.common.japi_version) = "0.1.0";
+
+option (jnx.jet.common.junos_release) = "21.4";
+
+// [brief]: Authentication service for Junos APIs
+// [detail]: Authentication service to allow a client endpoint to authenticate
+// itself to gain access to Junos APIs
+service Authentication {
+  // [brief]: Verify client credentials
+  // [detail]: Verify client credentials by checking passed in
+  // username/password against what is registered with the Junos device
+  rpc Login (LoginRequest) returns (LoginResponse) {}
+}
+
+// [brief]: Request message representing client login credentials
+// [detail]: Request message representing client login credentials
+message LoginRequest {
+  // [brief]: Client User name
+  string username = 1;
+  // [brief]: Client password
+  string password = 2;
+  // [brief]: Client ID
+  string client_id = 3;
+  // [brief]: Group ID
+  string group_id = 4;
+}
+
+// [brief]: Response message representing the status of the LoginCheck RPC.
+// [detail]: Response message representing the status of the LoginCheck RPC.
+message LoginResponse {
+  reserved 2;
+  reserved "sub_code";
+
+  // [brief]: Login status
+  jnx.jet.common.RpcStatus status = 1;
+}

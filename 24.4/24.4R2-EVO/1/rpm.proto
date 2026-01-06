@@ -1,0 +1,202 @@
+/*
+ * $Id$
+ *
+ * Copyright (c) 2020, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+import "rmop_error.proto";
+import "rmop_pm.proto";
+import "jnx_addr.proto";
+
+package rmop;
+
+/*
+ * RpmOwnerCfg
+ *   Rpm owner cfg parameters. It is an empty message. If later there is config settings in rpm
+ *   owners then we can update this as well.
+ */
+message RpmOwnerCfg {
+    uint64 owner_id                            = 1;
+}
+
+/*
+ * RpmOwnerCfgError
+ *   Rpm owner cfg add/change errors
+ */
+enum RpmOwnerCfgError {
+    ROCE_NONE                                  = 0;
+    ROCE_INVALID_OWNER_ID                      = 1;
+    ROCE_FAILURE                               = 2;
+}
+
+/*
+ * RpmOwnerCfgResult
+ *   Rpm owner cfg add/change result
+ */
+message RpmOwnerCfgResult {
+    string name                                = 1;
+    uint64 id                                  = 2;
+    RpmOwnerCfgError error                     = 3;
+}
+
+/*
+ * RpmOwner
+ *   Rpm owner for which to perform operations
+ */
+message RpmOwner {
+    uint64 id                                  = 1;
+}
+
+/*
+ * enum RpmProbeType
+ *   Probe types supported for rpm tests
+ */
+enum RpmProbeType {
+    HTTP_GET                                   = 0;
+    HTTP_METADATA_GET                          = 1;
+    ICMP                                       = 2;
+    ICMP_TIMESTAMP                             = 3;
+    ICMP6                                      = 4;
+    TCP                                        = 5;
+    UDP                                        = 6;
+    UDP_TIMESTAMP                              = 7;
+}
+
+/*
+ * RpmThresholdCfg
+ *   Thresholds attached to rpm test
+ */
+message RpmThresholdCfg {
+    uint32 egress_time                         = 1;
+    uint32 ingress_time                        = 2;
+    uint32 jitter_egress                       = 3;
+    uint32 jitter_ingress                      = 4;
+    uint32 jitter_rtt                          = 5;
+    uint32 rtt                                 = 6;
+    uint32 successive_loss                     = 7;
+    uint32 total_loss                          = 8;
+}
+
+/*
+ * RpmTestCfg
+ *   Rpm test cfg parameters
+ */
+message RpmTestCfg {
+    uint64 owner_id                            = 1;
+    uint64 test_id                             = 2;
+    RpmProbeType probe_type                    = 3;
+    jnxBase.IpAddress target                   = 4;
+    uint32 destination_port                    = 5;
+    jnxBase.IpAddress source_address           = 6;
+    string routing_instance                    = 7;
+    uint32 data_size                           = 8;
+    uint32 ttl                                 = 9;
+    uint32 probe_count                         = 10;
+    uint32 probe_interval                      = 11;
+    uint32 test_interval                       = 12;
+    RpmThresholdCfg thresholds                 = 13;
+}
+
+/*
+ * RpmTestCfgError
+ *   Rpm test cfg add/change errors
+ */
+enum RpmTestCfgError {
+    RTCE_NONE                                  = 0;
+    RTCE_NO_OWNER_ID                           = 1;
+    RTCE_UNKNOWN_OWNER_ID                      = 2;
+    RTCE_UNKNOWN_TEST_ID                       = 3;
+    RTCE_NO_TARGET_ADDRESS                     = 4;
+    RTCE_INVALID_TARGET_ADDRESS                = 5;
+    RTCE_INVALID_SOURCE_ADDRESS                = 6;
+    RTCE_UNKNOWN_PROBE_TYPE                    = 7;
+    RTCE_FAILURE                               = 8;
+}
+
+/*
+ * RpmTestCfgResult
+ *   Rpm test cfg add/change result
+ */
+message RpmTestCfgResult {
+    string name                                = 1;
+    string owner_name                          = 2;
+    uint64 id                                  = 3;
+    uint64 owner_id                            = 4;
+    RpmTestCfgError error                      = 5;
+}
+
+/*
+ * RpmTest
+ *   Test for which to perform operations
+ */
+message RpmTest {
+    uint64 id                                  = 1;
+}
+
+/*
+ * RpmTestStatusNotification
+ *   Test status notification
+ */
+message RpmTestStatusNotification {
+    uint64 test_id                             = 1;
+    bool   passed                              = 2;
+}
+
+message RpmPmNotifyThresholds {
+    uint32 rtt_min                             = 1;
+    uint32 rtt_max                             = 2;
+    uint32 rtt_avg                             = 3;
+    uint32 egress_delay_min                    = 4;
+    uint32 egress_delay_max                    = 5;
+    uint32 egress_delay_avg                    = 6;
+    uint32 ingress_delay_min                   = 7;
+    uint32 ingress_delay_max                   = 8;
+    uint32 ingress_delay_avg                   = 9;
+    uint32 egress_jitter_min                   = 10;
+    uint32 egress_jitter_max                   = 11;
+    uint32 egress_jitter_avg                   = 12;
+    uint32 ingress_jitter_min                  = 13;
+    uint32 ingress_jitter_max                  = 14;
+    uint32 ingress_jitter_avg                  = 15;
+}
+
+/*
+ * RpmMeasurementsSubscribe
+ *   Subscribe for measurements notifications
+ */
+message RpmMeasurementsSubscribe {
+    uint64 test_id                             = 1;
+    RpmPmNotifyThresholds thresh               = 2;
+    uint32 seconds                             = 3;
+    RpmPmNotifyThresholds periodic_thresh      = 4;
+}
+
+/*
+ * RpmMeasurementsNotification
+ *   Measurements notification
+ */
+message RpmMeasurementsNotification {
+    uint64 test_id                             = 1;
+    Measurements measurements                  = 2;
+}
+
+/*
+ * Rpm service offered by rmopd
+ */
+service Rpm {
+    rpc OwnerAdd(RpmOwnerCfg) returns (RpmOwnerCfgResult) {}
+    rpc OwnerDelete(RpmOwner) returns (Error) {}
+    rpc TestAdd(RpmTestCfg) returns (RpmTestCfgResult) {}
+    rpc TestDelete(RpmTest) returns (Error) {}
+    rpc TestStart(RpmTest) returns (Error) {}
+    rpc TestStop(RpmTest) returns (Error) {}
+    rpc GetMeasurements(RpmTest) returns (Measurements) {}
+    rpc SubscribeTestStatus(RpmTest) returns (Error) {}
+    rpc UnsubscribeTestStatus(RpmTest) returns (Error) {}
+    rpc SubscribeMeasurements(RpmMeasurementsSubscribe) returns (Error) {}
+    rpc UnsubscribeMeasurements(RpmTest) returns (Error) {}
+    rpc TestStatusNotification(Empty) returns (stream RpmTestStatusNotification) {}
+    rpc MeasurementsNotification(Empty) returns (stream RpmMeasurementsNotification) {}
+}

@@ -1,0 +1,380 @@
+/**
+ * Copyright (c) 2018-2019, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+/*
+ * Depends on common JNX and RPD API definitions
+ */
+import "jnx_addr.proto";
+import "prpd_common.proto";
+
+/**
+ * This is part of the routing package.
+ */
+package routing;
+
+/*
+ * This IDL defines objects that specify lighweight encapsulation and
+ * decapsulation parameters for flexible tunnels. This type of tunnel
+ * is intended to be controlled via JET applications for efficient,
+ * high-scale dynamic tunneling. The tunnels created by these objects
+ * do not have control plane functionality, i.e., protocols or other
+ * control plane features cannot run over these interfaces, but they are
+ * sent to the forwarding plane where forwarding state is instantiated for
+ * them.
+ *
+ * In the context of this API, an "attribute" is a single parameter of
+ * the tunnel encapsulation/decapsulation (e.g. source port), while
+ * a "profile" the complete set of attributes that fully defines all
+ * required parameters needed to encapsulate or decapsulate traffic.
+ */
+
+/**
+ * A set of VXLAN flexible tunnel attributes contains the encapsulation and/or
+ * decapsulation parameters specific to a VXLAN flexible tunnel.
+ *
+ * A VXLAN decapsulation tunnel is considered unique only if the full tuple
+ * of VNI, source prefix/length, and destination port is
+ * unique from other decapsulation tunnels. Adding or updating VXLAN
+ * decapsulation tunnel with conflicting attributes will result in an error.
+ */
+message VxlanTunnelAttributes {
+    /**
+     * VXLAN Network Identifier (VNI) is a 24-bit value ranging from
+     * 1 to 16777214 (inclusive).
+     * REQUIRED for both encapsulations and decapsulations.
+     */
+    uint32              vni = 1;
+
+    /**
+     * Outer source address prefix for the encapsulated traffic.
+     * Must be IPv4 or IPv6.
+     * REQUIRED for both encapsulations and decapsulations.
+     */
+    NetworkAddress      source_prefix = 2;
+
+    /**
+     * Source address prefix length. REQUIRED for both encapulations
+     * and decapsulations. For encapsulation, it must be the host
+     * address prefix length (i.e. 32 for IPv4, 128 for IPv6).
+     */
+    uint32              source_prefix_len = 3;
+
+    /**
+     * Outer source UDP port range. The source port for each route will be
+     * picked from the given range.  Port numbers are 16-bit values ranging
+     * from 0 to 65535 (inclusive).
+     * REQUIRED for encapsulations, OPTIONAL and ignored for decapsulations.
+     */
+    jnxBase.NumericRange source_udp_port_range = 4;
+
+    /**
+     * Source MAC address, a 48-bit MAC value. OPTIONAL.
+     * If not specified, JUNOS will set the source MAC by
+     * default for encapsulations.
+     */
+    jnxBase.MacAddress  source_mac = 5;
+
+    /**
+     * Outer destination address for the encapsulated traffic.
+     * Must be the IPv4 or IPv6 address of a local interface.
+     * REQUIRED for encapsulations, OPTIONAL and ignored for decapsulations.
+     */
+    NetworkAddress      destination_address = 6;
+
+    /**
+     * Outer destination UDP port, a 16-bit value ranging from 0 to 65535
+     * (inclusive). REQUIRED for both encapsulations and decapsulations.
+     */
+    uint32              destination_udp_port = 7;
+
+    /**
+     * Destination MAC address, a 48-bit MAC value. OPTIONAL.
+     * If not specified, JUNOS will set the destination MAC by
+     * default for encapsulations.
+     */
+    jnxBase.MacAddress  destination_mac = 8;
+
+    /**
+     * VXLAN Flags are 8 bits of flags as specified in RFC7348.
+     * OPTIONAL. If not specified, the default RFC7348 value of 0x08
+     * will be used in encapsulations.
+     */
+    uint32              flags = 9;
+
+    /**
+     * VXLAN header fields reserved as of RFC7348.
+     */
+    oneof vxlan_header_reserved {
+        /** VXLAN header reserved fields as defined in RFC7348. */
+        Rfc7348VxlanReserved rfc7348_reserved = 10;
+    }
+}
+
+/**
+ * VXLAN header reserved fields as defined in RFC7348.
+ */
+message Rfc7348VxlanReserved {
+    /**
+     * VXLAN 24-bit reserved field as specified in RFC7348.
+     * This is the RFC7348 VXLAN header 24-bit reserved field that
+     * follows the VXLAN flags and preceeds the VNI (bits 8-31).
+     * OPTIONAL. If not set, the bits will be set to all zeros.
+     * If set, only the lower 24-bits may be non-zero.
+     * This field is ignored for decapulation profiles.
+     */
+    uint32              reserved_bits_8_31 = 1;
+
+    /**
+     * VXLAN 8-bit reserved field as specified in RFC7348.
+     * This is the RFC7348 VXLAN header 8-bit reserved field that
+     * follows the VNI (bits 55-63).
+     * OPTIONAL. If not set, the will be set to all zeros.
+     * If set, only the lower 8-bits may be non-zero.
+     * This field is ignored for decapulation profiles.
+     */
+    uint32              reserved_bits_55_63 = 2;
+}
+
+/**
+ * A set of GRE flexible tunnel attributes contains the encapsulation and/or
+ * decapsulation parameters specific to a GRE flexible tunnel.
+ *
+ * A GRE decapsulation tunnel is considered unique only if the full tuple
+ * of gre_key,source prefix/length,destination address and inner source address
+ * is unique from other decapsulation tunnels. Adding or updating GRE
+ * decapsulation tunnel with conflicting attributes will result in an error.
+ */
+message GreTunnelAttributes {
+    /**
+     * Tunnel outer source address prefix for the Encapsulated traffic.
+     * REQUIRED for both encapsulations and decapsulation.
+     * Only IPv4 GRE tunnel is supported currently.
+     */
+    NetworkAddress    source_prefix           = 1;
+
+    /**
+     * Source address prefix length. REQUIRED for both encapsulations
+     * and decapsulations. For encapsulation, it must be the host
+     * address prefix length (i.e. 32 for IPv4).
+     */
+    uint32              source_prefix_len     = 2;
+
+    /**
+     * Tunnel outer destination IP address.
+     * REQUIRED for both encapsulation and decapsulation.
+     * Only IPv4 GRE tunnel is supported currently.
+     */
+    NetworkAddress    destination_address     = 3;
+
+    /**
+     * OPTIONAL inner source IP address for decapsulation matching.
+     * If not specified it will be used for source specific matching.
+     * Default is NULL.
+     */
+    NetworkAddress    inner_source_address    = 4;
+
+    /**
+     * 32-bit GRE key.
+     * REQUIRED for both encapsulation and decapsulation.
+     */
+    uint32 gre_key                            = 5;
+
+    /**
+     * Routing-instance name to decapsulate the packet into.
+     * OPTIONAL for encapsulation and REQUIRED for decapsulation.
+     * Default is master instance for encapsulation.
+     */
+    string          target_vrf_name           = 6;
+}
+
+/**
+ * IPv4 to IPv6 address translation by adding prefix.
+ */
+message Ipv4Ipv6MsbParams {
+    /**
+     * IPv6 96-bit prefix. IPv4 address will occupy
+     * the 32 least-significant bits of the translated address.
+     * REQUIRED.
+     */
+    jnxBase.IpAddress  ipv6_prefix   = 1;
+}
+
+/**
+ * IPv6 prefix used to map incoming IPv4 address directly
+ * the IPv6 address.
+ */
+message Ipv4Ipv6MappingParams {
+    /**
+     * IPv6 prefix that will be directly mapped from the IPv4 address.
+     */
+    jnxBase.IpAddress  ipv6_prefix   = 1;
+}
+
+/**
+ * IPv6 to IPv4 translation by stripping the prefix.
+ */
+message Ipv6Ipv4StripMsb {
+   /** Empty message. */
+}
+
+/**
+ * IPv6 to IPv4 address translation params.
+ */
+message Ipv6Ipv4AddressTranslationParams {
+    /**
+     * Translation parameters specific to the algorithm provided.
+     */
+    oneof Ipv6Ipv4TranslationMethodParams {
+        /**
+         * Strip the 96-bit most significant bits to get
+         * 32-bit IPv4 prefix.
+         * REQUIRED.
+         */
+        Ipv6Ipv4StripMsb ipv6_ipv4_strip_msb = 1;
+    }
+}
+
+/**
+ * IPv4 to IPv6 address translation parameters which are needed for
+ * translation of IPv4 prefix in the header to IPv6.
+ */
+message Ipv4Ipv6AddressTranslationParams {
+    /**
+     * Translation parameters specific to the method.
+     */
+    oneof Ipv4Ipv6TranslationMethodParams {
+        /**
+         * The packet's IPv4 address will be prefixed with the
+         * given 96 most significant bits to form the translated
+         * IPv6 address.
+         */
+        Ipv4Ipv6MsbParams ipv4_ipv6_msb     = 1;
+        /**
+         * IPv6 128-bit prefix that will be directly mapped from the IPv4 address.
+         */
+        Ipv4Ipv6MappingParams ipv4_ipv6_map = 2;
+    }
+}
+
+/**
+ * Parameters to be used to translate the source and destination
+ * IPv6 prefix to IPv4 prefix in the IP header.
+ */
+message Ipv6Ipv4TranslationParams {
+    /**
+     * Source address translation parameters.
+     * REQUIRED.
+     */
+    Ipv6Ipv4AddressTranslationParams source_params = 1;
+
+    /**
+     * Destination address translation parameters.
+     * REQUIRED.
+     */
+    Ipv6Ipv4AddressTranslationParams dest_params   = 2;
+}
+
+/**
+ * Parameters to be used to translate the source and destination
+ * IPv4 prefix to IPv6 prefix in the IP header.
+ */
+message Ipv4Ipv6TranslationParams {
+    /**
+     * Source address translation parameters.
+     * REQUIRED.
+     */
+    Ipv4Ipv6AddressTranslationParams source_params = 1;
+
+    /**
+     * Destination address translation parameters.
+     * REQUIRED.
+     */
+    Ipv4Ipv6AddressTranslationParams dest_params   = 2;
+}
+
+/**
+ * Specifies a set of TunnelAttributes for the
+ * translation of IP header.
+ */
+message TranslationAttributes {
+    /** Translation parameters type */
+    oneof translate_params_type {
+        /** Params to translate IPv4 to IPv6 */
+        Ipv4Ipv6TranslationParams ipv4_ipv6_xlate = 1;
+        /** Params to translate IPv6 to IPv4 */
+        Ipv6Ipv4TranslationParams ipv6_ipv4_xlate = 2;
+    }
+
+    /**
+     * Routing instance name where the next lookup should happen,
+     * post translation.
+     * REQUIRED for both Ipv6 to Tpv4 and Ipv4 to Ipv6
+     * translation.
+     */
+    string                  target_vrf_name       = 3;
+}
+
+/**
+ * Encapsulation/Decapsulation attibutes for various types of tunnels
+ * and Translation attributes for IP header translation.
+ */
+message TunnelAttributes {
+    /** Tunnel types supported by flexible tunnels. */
+    oneof tunnel_attributes_type {
+        /** VXLAN tunnels. */
+        VxlanTunnelAttributes    vxlan      = 1;
+        /** Gre tunnels. */
+        GreTunnelAttributes      gre        = 2;
+        /** Translation attributes. */
+        TranslationAttributes    translate  = 3;
+    }
+}
+
+/**
+ * The given TunnelAttributes can used by the route for
+ * encapsulation, decpasulation, or both symetrically.
+ */
+enum TunnelActionType {
+    /** Use associated TunnelAttributes to encapsulate packets. */
+    ENCAPSULATE           = 0;
+    /** Use associated TunnelAttributes to decapsulate packets. */
+    DECAPSULATE           = 1;
+    /** Use associated TunnelAttributes to translate IP header. */
+    TRANSLATE             = 2;
+}
+
+/**
+ * A flexible tunnel profile contains a set encapsulation parameters for a
+ * flexible tunnel. It may specify an encapsulation, decapsulation or
+ * translation.
+ */
+message FlexibleTunnelProfile {
+    /**
+     * A unique client-assigned name for this profile.
+     * OPTIONAL when FlexibleTunnelProfile is used in RouteGateway.
+     * REQUIRED when used with any RPC from the flexible_tunnel_service.
+     */
+    string                   name = 1;
+
+    /**
+     * The action that this profile will be used for: encapsulate,
+     * decapsulate, or symetric in both directions. REQUIRED.
+     */
+    TunnelActionType         action = 2;
+
+    /**
+     * Name of the anchoring tunnel interface to use for
+     * statistics, policing, filtering, and default encapsulation parameters.
+     * REQUIRED when using vxlan tunnel profle.
+     */
+    string                   interface_name = 3;
+
+    /**
+     * The encapsulation parameters defining the profile. REQUIRED.
+     */
+    TunnelAttributes         attributes = 4;
+}

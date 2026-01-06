@@ -1,0 +1,280 @@
+/**
+ * $Id: mpls_api_service.japi 1150083 2020-11-09 06:03:37Z bhats $
+ *
+ * Copyright (c) 2016, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+
+import "prpd_common.proto";
+
+package routing;
+
+/**
+ * LSP ping information retrieval associated generic status codes which are
+ * applicable to all types of LSPs
+ */
+enum LspPingGetInfoStatus {
+    /** Indicates LSP get information was successfully called */
+    LSP_PING_GET_SUCCESS= 0;
+    /** Internal error like malloc or read/write failure occured */
+    LSP_PING_GET_INTERNAL_ERROR = 1;
+    /** Indicates that the input paramter is not valid */
+    LSP_PING_GET_INVALID_PARAMETER = 2;
+}
+
+/**
+ * RSVP LSP associated flags for manual and dynamic bypass.
+ */
+message RsvpLspFlags {
+    /** Flag to indicate RSVP bypass type is dynamic */
+    bool rsvp_dynamic_bypass_lsp = 1;
+    /** Flag to indicate RSVP bypass type is manual */
+    bool rsvp_manual_bypass_lsp = 2;
+}
+
+/**
+ * Request message to get the RSVP LSPing Info for the application to check
+ * the reachability to that RSVP LSP.
+ */
+message RsvpLspPingInfoRequest {
+    /** Flag associated with the request - OPTIONAL, default: Null */
+    RsvpLspFlags flags = 1;
+    /** LSP name for which the info is requested - MANDATORY */
+    string lsp_name = 2;
+    /**
+     * Path name for which the info is requested - OPTIONAL, default: Null
+     * indicate active path
+     */
+    string path_name = 3;
+    /**
+     * Interface name for which the info is requested - OPTIONAL,
+     * default: Null, for manual bypass this should not be Null
+     */
+    string interface_name = 4;
+    /**
+     * Instance name for which the info is requested - OPTIONAL,
+     * default: Null indicate master instance
+     */
+    string instance_name = 5;
+}
+
+/**
+ * MPLS forwarding info, label, interface and routing table info. 
+ */
+message MplsForwardingInfo {
+    /** Nexthop address corresponding to the LSP */
+    RoutePrefix nexthop_address = 1;
+    /** Router id as the src addr of the ip pkt */
+    RoutePrefix nexthop_router_id = 2;
+    /** Used in case of pseudo-wire BFD */
+    RoutePrefix nexthop_route_idx = 3;
+    /** Flag indicating the control channel type */
+    uint32  nexthop_control_channel_flag = 4;
+    /** Nexthop label information */
+    LabelStack nexthop_label = 5;
+   /** Nexthop interface name */
+    string nexthop_interface_name  = 6;
+}
+
+/**
+ * Return error or status codes while retrieving RSVP Information
+ */
+enum RsvpLspPingStatus {
+    /** RSVP LSP information was successuly retrieved */
+    RSVP_LSP_PING_NOERROR = 0;
+    /** Requested LSP not found */
+    RSVP_LSP_PING_LSP_NOTFOUND = 1;
+    /** Requested LSP is not RSVP signaled */
+    RSVP_LSP_PING_NO_RSVP_INFO = 2;
+    /** RSVP LSP has no path information */
+    RSVP_LSP_PING_NO_PATH_INFO = 3;
+    /** RSVP LSP has no route information */
+    RSVP_LSP_PING_NO_ROUTE_INFO = 4;
+    /** RSVP LSP has no active path */
+    RSVP_LSP_PING_NO_ACTIVE_PATH = 5;
+    /** Requested standby path not found */
+    RSVP_LSP_PING_STANDBY_PATH_NOTFOUND = 6;
+    /** Record route object for requested CCC LSP not found */
+    RSVP_LSP_PING_CCC_NORRO = 7;
+    /** Operation not supported for P2MP LSPs */
+    RSVP_LSP_PING_P2MP_NOSUP = 8;
+    /** No Egress destinations found for P2MP LSP */
+    RSVP_LSP_PING_P2MP_NO_EGRESS = 9;
+    /** No flood nexthop found for P2MP LSP */
+    RSVP_LSP_PING_P2MP_NO_FLOOD_NHOP = 10;
+    /** IFL-name needs to be specified for manual bypass */
+    RSVP_LSP_PING_BYPASS_NEED_IINTERFACE_NAME = 11;
+}
+
+/**
+ * Success status codes while retrieving RSVP Information
+ */
+enum RsvpLspPingSuccessStatus {
+    /** RSVP LSP path is primary */
+    RSVP_LSP_PING_LSP_PRIMARY = 0;
+    /** RSVP LSP path is secondary */
+    RSVP_LSP_PING_LSP_SECONDARY = 1;
+    /** RSVP LSP is a bypass LSP */
+    RSVP_LSP_PING_LSP_BYPASS = 2;
+}
+
+/** RSVP LSP information required to do a LspPing */
+message  RsvpLspPingInfo {
+    /** RSVP specific error/status code while retrieving the requested LSP */
+    RsvpLspPingStatus status = 1;
+    /** RSVP specific success status code while retrieving the requested LSP */
+    RsvpLspPingSuccessStatus success_status = 2;
+    /** Destination address of LSP */
+    RoutePrefix destination_address = 3;
+    /** External tunnel identifier, an address */
+    RoutePrefix ext_tunnel_id = 4;
+    /** Sender address */
+    RoutePrefix sender_address = 5;
+    /** LSP tunnel identifier */
+    uint32 tunnel_id = 6;
+    /** LSP identifier */
+    uint32 lsp_id = 7;
+    /** Represents ttl value by default 255, non-zero for CCC Lsp */
+    uint32 nexthops = 8;
+    /** BFD discriminator to initiate a BFD session with remote side of LSP */
+    uint32 bfd_discriminator = 9;
+    /** LSP source ip address */
+    RoutePrefix lsp_from_address = 10;
+    /** Sensor id for RSVP LSP */
+    uint64 sensor_id = 11;
+    /** Flag to indicate traffic class sensor attributes */
+    uint32 flags = 12;
+    /** MPLS forwarding information */
+    MplsForwardingInfo nexthop_info = 13;
+}
+
+/** Reply message for the RSVP LspPing Info request */
+message RsvpLspPingInfoReply {
+    /** Generic return status */
+    LspPingGetInfoStatus status= 1;
+    /** RSVP LSP information retrieved */
+    RsvpLspPingInfo rsvp_info = 2;
+}
+
+/**
+ * Request message to get the LDP LspPing Info for the
+ * application to check the reachability to that LDP Lsp.
+ */
+message LdpLspPingInfoRequest {
+    /** Destination address - MANDATORY */
+    RoutePrefix prefix = 1;
+    /** Prefix length - MANDATORY */
+    uint32 prefix_length = 2;
+    /**
+     * Name of instance to which the LDP LSP requested
+     * belongs to - OPTIONAL, default: Null indicate
+     * master instance
+     */
+    string instance_name = 3;
+}
+
+/** Return code for LDP LSP ping information request operations */
+enum LdpLspPingStatus {
+    /** LDP FEC information is successfully retrieved */
+    LDP_LSP_PING_NOERROR = 0;
+    /** Requested LDP FEC LSP is not found */
+    LDP_LSP_PING_FEC_NOTFOUND = 1;
+    /** Requested LDP P2MP FEC LSP is not found */
+    LDP_LSP_PING_P2MP_FEC_NOTFOUND = 2;
+    /** Requested routing instance is not found */
+    LDP_LSP_PING_INSTANCE_NOTFOUND = 3;
+}
+
+/** LDP information required to do a LSP ping to LDP LSP */
+message LdpLspPingInfo {
+    /** LDP specific error/status code while retrieving the requested LSP */
+    LdpLspPingStatus status = 1;
+    /** BFD discriminator to initiate a BFD session with remote side of LSP */
+    uint32      bfd_discriminator = 2;
+    /** MPLS forwarding information */
+    MplsForwardingInfo nexthop_info = 3;
+}
+
+/** Reply message for the LDP LspPing Info request */
+message  LdpLspPingInfoReply {
+    /** Generic return status */
+    LspPingGetInfoStatus status= 1;
+    /** LDP LSP ping information */
+    LdpLspPingInfo ldp_info = 2;
+}
+
+/**
+ * Request message to get the VPN LspPing Info for the
+ * application to check the reachability to that VPN route.
+ */
+ message VpnLspPingInfoRequest {
+    /** Destination address - MANDATORY */
+    RoutePrefix prefix = 1;
+    /** Prefix length - MANDATORY */
+    uint32 prefix_length = 2;
+    /**
+     * Name of instance to which the VPN LSP requested
+     * belongs to - MANDATORY
+     */
+    string instance_name = 3;
+ }
+
+/** Return code for VPN LSP ping information request operations */
+enum VpnLspPingStatus {
+    /**
+     * VPN Route distinguisher and nexthop information were 
+     * successfully retrieved
+     */
+    VPN_LSP_PING_NOERROR = 0;
+    /** VPN is not found */
+    VPN_LSP_PING_NOTFOUND = 1;
+    /** Requested prefix not found in this VPN's table */
+    VPN_LSP_PING_PFX_NOTFOUND = 2;
+    /** No nexthop information available for this prefix */
+    VPN_LSP_PING_NH_NOTFOUND = 3;
+    /** This prefix was not learnt from a remote site */
+    VPN_LSP_PING_NH_NOT_REMOTE = 4;
+    /** The nexthop for this prefix is not resolved */
+    VPN_LSP_PING_NH_NOT_RESOLVED = 5;
+    /**
+     * During graceful restart, cannot retrieve all the information necessary
+     * for issuing a L3VPN LSP ping
+     */
+    VPN_LSP_PING_IN_GRACEFUL_RESTART = 6;
+}
+
+message VpnLspPingInfo {
+    /** VPN specific error/status code while retrieving the requested LSP */
+    VpnLspPingStatus status = 1;
+    /** Route distinguisher */
+    RouteDistinguisher rd = 2;
+    /** MPLS forwarding information */
+    MplsForwardingInfo nexthop_info = 3;
+}
+
+message VpnLspPingInfoReply {
+    /** Generic return status */
+    LspPingGetInfoStatus status= 1;
+    /** VPN LSP ping information */
+    VpnLspPingInfo vpn_info = 2;
+}
+
+service MplsApi {
+    /**
+     * Following are services to get the appropriate information required to do
+     * a ping to the LSP.
+     */
+
+    /** Service to get the RSVP LSP information */
+    rpc LspPingGetRsvpInfo (RsvpLspPingInfoRequest) returns (RsvpLspPingInfoReply) {}
+
+
+    /** Service to get the LDP LSP information */
+    rpc LspPingGetLdpInfo (LdpLspPingInfoRequest) returns (LdpLspPingInfoReply) {}
+
+
+    /** Service to get the VPN LSP information */
+    rpc LspPingGetVpnInfo (VpnLspPingInfoRequest) returns (VpnLspPingInfoReply) {}
+}
