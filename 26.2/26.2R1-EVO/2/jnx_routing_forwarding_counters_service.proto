@@ -1,0 +1,150 @@
+//
+// Copyright 2025, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: This package defines service for fetching named forwarding counters
+// for route or next-hop objects programmed using JNX RIB APIs.
+// [detail]: Named forwarding counters can be attached one or more gateway
+// entries of a next-hop. When attached to multiple entries counter value
+// is the aggregate of the counter for each gateway entry.
+// These routes and next-hops can be added using gRPC JNX RIB service APIs
+// RouteAdd/RouteModify/RouteUpdate. The "counter_name" field of "RouteGateway"
+// object corresponds to the counter name and must be set along with "enable_stats"
+// field set to TRUE.
+
+package jnx.jet.routing.rib;
+
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+
+option (jnx.jet.common.japi_version) = "0.1.0";
+
+option (jnx.jet.common.junos_release) = "24.4";
+
+// [brief]: Service for fetching named forwarding counters for routes and next-hops
+// added using JNX RIB APIs.
+// [detail]: gRPC service for fetching named forwarding counters attached to
+// gateway entries of next-hop objects. These routes and next-hops can be added
+// using gRPC JNX RIB service APIs RouteAdd/RouteModify/RouteUpdate. The
+// "counter_name" field of "RouteGateway" object corresponds to the counter name
+// and must be set along with "enable_stats" field set to TRUE.
+service ForwardingCounterService {
+    // [brief]: Get one, more or all available forwarding counters as a stream.
+    // [detail]: Sender closes the stream when end of stream is reached.
+    // Status of the request is set at the gRPC layer.
+    rpc ForwardingCounterGet(ForwardingCounterGetRequest) returns (stream ForwardingCounterGetResponse) {}
+}
+
+// [brief]: Request for counters
+// [detail]: Get one, more or all available NH counters depending on the request.
+message ForwardingCounterGetRequest {
+    // [brief]: Specify match type to be applied on counter_name.
+    // [detail]: Applied on counter objects maintained by the caching daemon.
+    // [default]: ALL
+    enum MatchType {
+        // [brief]: Get all counters. counter_names is ignored.
+        // [detail]: One or more response objects are streamed if no errors.
+        ALL      = 0;
+
+        // [brief]: Get all counters matching wildcard (using fnmatch). Only one
+        // entry in the counter_names list is supported.
+        // [detail]: WILDCARD match is not supported in this release. gRPC status
+        // UNIMPLEMENTED will be returned.
+        WILDCARD = 1;
+
+        // [brief]:  Get all counters with an exact match. counter_names list
+        // must have one or more entries.
+        // [detail]: Empty counter_name string doesn't match any. No check is
+        // performed for duplicate names. counter_name may not be checked for
+	// validity for all scenarios.
+        // NOTE: EXACT match is not supported in this release. gRPC status
+        // UNIMPLEMENTED will be returned.
+        EXACT    = 2;
+    }
+
+    // [brief]: match type to be applied on counter_names list.
+    // [detail]:
+    // NOTE: WILDCARD and EXACT match types are not supported in this release.
+    // gRPC status UNIMPLEMENTED will be returned if these match types are used.
+    // OPTIONAL. Defaults to ALL.
+    MatchType       match_type    = 1;
+
+    // [brief]: list of counter names. See match_type for more details.
+    // [detail]: When an adding route entry using RIB API RouteAdd/RouteModify/RouteUpdate,
+    // counter_name can be specified in next-hop gateway entry.
+    // NOT_REQUIRED for match_type ALL.
+    // MANDATORY for all other match_type values.
+    repeated string counter_names = 2;
+
+    // [brief]: Maximum number of counter entries per response object.
+    // [detail]: Actual number of entries per response could be lower,
+    // but non-zero unless end of stream is reached. At the end of the stream,
+    // sender will close with appropiate gRPC status.
+    // defaults to 1 if not specified or zero.
+    // max allowed is 4096. If a value more than 4096 is specified it will be capped to 4096.
+    // OPTIONAL.
+    uint32      entries_per_response            = 3;
+}
+
+// [brief]: Response message for ForwardingCounterGetRequest.
+// [detail]: Holds zero or more forwarding counter entries depending on request
+// state of the stream.
+message ForwardingCounterGetResponse {
+    // [brief]: Response for one counter object.
+    // [detail]: Only counter_name is populated if counters don't exist in the device.
+    message ResponseEntry {
+        // [brief]: Name of the counter.
+        // [detail]: When match_type is EXACT in GetRequest, counter_name
+        // holds the value passed in the GetRequest. For WILDCARD match,
+        // counter_name holds the full name of the counter matching
+        // the pattern. For ALL, counter_name holds name of the counter
+        // present in the device.
+        string              counter_name    = 1;
+
+        // [brief]: Counter object is present only if entry is valid/available.
+        // [detail]: If the counter object is populated, but zero, it means
+        // object is present in the system but not used for forwarding traffic
+        // or doesn't match.
+        ForwardingCounter   counter = 2;
+    }
+    // [brief]: List of forwarding counter entries.
+    // [detail]: For match_type ALL and WILDCARD: Holds one or more response entries
+    // unless its end of stream or no counters are present or no counters match the
+    // wildcard pattern.
+    // For match_type EXACT: holds one or more entries if the request included
+    // counter_name list of non-zero length.
+    repeated ResponseEntry entries  = 1;
+}
+
+// [brief]: Forwarding Counter for a given counter name.
+// [detail]: A counter can be attached to one or more forwarding objects
+// (routes or next-hops).  When attached to multiple objects,
+// counter holds the aggregated values.
+message ForwardingCounter {
+    // [brief]: Traffic statistics packet counts.
+    uint64  packets     = 1;
+
+    // [brief]: Traffic statistics byte count.
+    uint64  octets      = 2;
+
+    // [brief]: Timestamp in nanoseconds since Unix epoch.
+    // [detail]: Timestamp when the counters are read by the system.
+    // On a multi-linecard system, individual counters (reported by each
+    // linecard) are aggregated and reported timestamp is approximated based
+    // on the timestamps reported by each linecard.
+    uint64  timestamp   = 3;
+}

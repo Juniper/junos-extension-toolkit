@@ -1,0 +1,74 @@
+// Copyright (c) 2023, Juniper Networks, Inc.
+// All rights reserved.
+
+// NOTE: The APIs specified in this file are NOT supported for external
+// or third-party use.
+
+// Definition of MPLS Bandwidth Update Service:
+// API is meant to be be used by any external application to update
+// bandwidth for auto-bandwidth enabled LSPs.
+//   (initial target user is cBPS)
+
+syntax = "proto3";
+
+// [brief]: This is part of the routing package.
+package jnx.jet.routing.mplsautobw;
+
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version.
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+// [brief]: LSP bandwidth Update status
+// [detail]: LSP bandwidth Update status codes which denote the status of
+//           Bandwidth Update on the LSP.
+// [default]: LSP_UPDATE_TRIGGER_SUCCESS.
+enum LspUpdateTriggerStatus {
+    // [brief]: Bandwidth Update was triggered
+    LSP_UPDATE_TRIGGER_SUCCESS = 0;
+    // [brief]: Error in triggering LSP Bandwidth Update
+    LSP_UPDATE_TRIGGER_ERROR = 1;
+}
+
+// [brief]: LSP bandwidth element
+// [detail]: LSP name and associated bandwidth to be updated.
+message LspBandwidth {
+    // [mandatory]:
+    // [brief]: LSP name
+    string lsp_name = 1;
+
+    // [mandatory]:
+    // [brief]: Bandwidth value
+    // [detail]: LSP bandwidth maximum value must be max(float) value.
+    //           Value should be in bps (bits per sec)
+    float bandwidth = 2;
+}
+
+// [brief]: LSP Bandwidth Request
+// [detail]: Request message to set Bandwidth for a set of MPLS LSPs by the application.
+message LspBandwidthUpdateRequest {
+    // [mandatory]:
+    // [brief]: LSP, BW list
+    // [detail]: List of LSPs for which Bandwidth needs to be updated
+    //           along with corresponding Bandwidth value
+    repeated LspBandwidth updatelsps = 1;
+}
+
+// [brief]: LSP Bandwidth Response
+// [detail]: Response message for the LspBandwidthUpdateRequest sent for a set of LSPs.
+message LspBandwidthUpdateResponse {
+    // [mandatory]:
+    // [brief]: Request status
+    // [detail]: Return code to indicate status of LspBandwidthUpdateRequest
+    LspUpdateTriggerStatus status = 1;
+}
+
+// [brief]: LSP Bandwidth Update service
+// [detail]: Service to update LSP Bandwidth for a set of LSPs provided by MPLS.
+service MplsLspBandwidthUpdate {
+
+    // [brief]: LSP Bandwidth Update
+    // [detail]: API to update Bandwidth for a set of MPLS LSPs.
+    rpc LspBandwidthUpdate (LspBandwidthUpdateRequest) returns (LspBandwidthUpdateResponse) {}
+}

@@ -1,0 +1,239 @@
+//
+// Copyright 2019, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// [detail]: This file provides services for ecmp-tracer flow management
+// It provides APIs to:
+// - Add new flows
+// - Get Counter stats for the added flows
+// - Delete the added flows
+
+syntax = "proto3";
+
+package jnx.jet.ecmptracer;
+
+// [version]: 0.1.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Initial version
+option (jnx.jet.common.japi_version) = "0.0.0";
+
+option (jnx.jet.common.junos_release) = "19.4";
+
+// [brief]: EcmpTracer Flow Management
+// [detail]: EcmpTracer Flow Management
+service EcmptracerFlow {
+    // [brief]: Add new flow
+    // [detail]: This rpc call returns a success or a failure reason depending upon the status of the flow added
+    rpc EcmptracerFlowAdd(EcmptracerFlowAddRequest) returns(EcmptracerFlowMonitorResponse) {}
+    
+    // [brief]: Delete flow and corresponding filters
+    // [detail]: This rpc call returns a success or a failure depending upon the status of the flows deleted
+    rpc EcmptracerFlowDelete(EcmptracerFlowInfoRequest) returns(EcmptracerFlowMonitorResponse) {}
+
+    // [brief]: Get counter stats for a flow
+    // [detail]: This rpc call returns the counter names, pkts and bytes count for the flow
+    rpc EcmptracerFlowGet (EcmptracerFlowInfoRequest) returns (EcmptracerFlowInfoResponse) {}
+}
+
+////////////////////////////////////////////////////////////////////
+//
+// Common Message Definitions
+//
+////////////////////////////////////////////////////////////////////
+
+// [brief]: Enum for server side input validation
+// [detail]: Enum carrying success or failure reasons returned from a GET rpc call
+// [default]: SUCCESS
+enum EcmptracerFlowMonitorStatus {
+    // [brief]: Request successfully completed
+    SUCCESS                  = 0;
+    
+    // [brief]: Request failed
+    FAILURE                  = 1;
+
+    // [brief]: Server not running
+    SERVER_NOT_RUNNING       = 2;
+
+    // [brief]: Invalid input entered
+    EINVALID_INPUT           = 3;
+    
+    // [brief]: Missing mandatory input
+    EMISSING_MANDATORY_INPUT = 4;
+    
+    // [brief]: Wrong family entered
+    EINVALID_FAMILY          = 5;
+
+    // [brief]: Invalid sip
+    EINVALID_SIP             = 6;
+
+    // [brief]: Invalid dip
+    EINVALID_DIP             = 7;
+
+    // [brief]: Invalid src prefix len
+    EINVALID_SRC_PLEN        = 8;
+    
+    // [brief]: Invalid dest pref len
+    EINVALID_DEST_PLEN       = 9;
+
+    // [brief]: Invalid src port
+    EINVALID_SPORT           = 10;
+
+    // [brief]: Invalid dest port
+    EINVALID_DPORT           = 11;
+
+    // [brief]: Invalid Port range
+    EINVALID_PORT_RANGE      = 12;
+
+    // [brief]: proto not provided
+    EPROTO_NOT_SPECIFIED     = 13;
+
+    // [brief]: Invalid proto entered
+    EINVALID_PROTO           = 14;
+
+    // [brief]: Flow does not exist
+    EFLOW_DOES_NOT_EXIST     = 15;
+
+    // [brief]: When there is an attempt to add flow with same name as an existing flow
+    EFLOW_EXISTS             = 16;
+}
+
+////////////////////////////////////////////////////////////////////
+//
+// Simple Status only Reply
+//
+////////////////////////////////////////////////////////////////////
+
+// [brief]: Reply carrying a success or failure status
+// [detail]: Reply carrying a success or failure status
+message EcmptracerFlowMonitorResponse {
+    // [brief]: Flow name in the Response
+    string flow_name                                = 1;
+
+    // [brief]: Status in the Response
+    EcmptracerFlowMonitorStatus           status    = 2;
+}
+
+////////////////////////////////////////////////////////////////////
+//
+// API : EcmptracerFlowAddRequest
+//
+////////////////////////////////////////////////////////////////////
+
+// [brief]: Flow add Request with input parameters
+// [detail]: Flow add Request with input parameters
+message EcmptracerFlowAddRequest {
+    
+    // [brief]: flow name for add
+    string flow_name       = 1;
+
+    // [brief]: addr family for flow
+    string family          = 2;
+
+    // [brief]: source Ip for flow
+    string src_ip          = 3;
+
+    // [brief]: source prefix len for flow
+    uint32 src_prefix_len  = 4;
+
+    // [brief]: Dest ip for flow
+    string dest_ip         = 5;
+
+    // [brief]: Dest pref len for flow
+    uint32 dest_prefix_len = 6;
+
+    // [brief]: Min src port for flow
+    uint32 min_src_port    = 7;
+
+    // [brief]: Max src port for flow
+    uint32 max_src_port    = 8;
+
+    // [brief]: Min dest port for flow
+    uint32 min_dest_port   = 9;
+
+    // [brief]: Max dest port for flow
+    uint32 max_dest_port   = 10;
+
+    // [brief]: Protocol for flow
+    uint32 proto           = 11;
+}
+
+// [brief]: Input to be passed to the GET rpc call
+// [detail]: Input to be passed to the GET rpc call
+message EcmptracerFlowInfoRequest {
+     // [brief]: flow name in the Request
+     string flow_name = 1;
+
+     // [brief]: address family in the Request
+     string family    = 2;
+}
+
+// [brief]: Counter information 
+// [detail]: Counter information along with interface name, pkts and bytes count
+message IntfCounter {
+    // [brief]: Interface name
+    string intf_name = 1;
+
+    // [brief]: Num of bytes
+    uint64 bytes = 2;
+
+    // [brief]: Num of packets
+    uint64 pkts = 3;
+}
+// [brief]: Enum carrying success or failure reasons returned from a GET rpc call
+// [detail]: Enum carrying success or failure reasons returned from a GET rpc call
+// [default]: STATUS_SUCCESS
+enum EcmptracerFlowInfoResponseStatus {
+    // [brief]: Success
+    STATUS_SUCCESS = 0;
+
+    // [brief]: Invalid message 
+    STATUS_EINVALID_MESSAGE = 1;
+
+    // [brief]: Server Internal error
+    STATUS_FAIL = 2;
+
+    // [brief]: Operation not supported
+    STATUS_EUNSUPPORTED_OP = 3;
+    
+    // [brief]: Flow doees not exist
+    STATUS_EFLOW_DOES_NOT_EXIST = 4;
+
+    // [brief]: Invalid input entered
+    STATUS_EINVALID_INPUT = 5;
+
+    // [brief]: Missing mandatory input
+    STATUS_EMISSING_MANDATORY_INPUT = 6;
+    
+    // [brief]: Invalid address family entered
+    STATUS_EINVALID_FAMILY = 7;
+
+}
+
+// [brief]: Response for a GET rpc call carrying the counter details
+// [detail]: Response for a GET rpc call carrying the counter details bifurcated as ingress/egress
+message EcmptracerFlowInfoResponse {
+    // [brief]: status for the get rpc call 
+    EcmptracerFlowInfoResponseStatus status = 1;
+   
+    // [brief]: flow name
+    string flow_name = 2;
+
+    // [brief]: ingress counter repeated field
+    repeated IntfCounter ingress_ctrs  = 3;
+
+    // [brief]: egress counter repeated field
+    repeated IntfCounter egress_ctrs  = 4;
+}
