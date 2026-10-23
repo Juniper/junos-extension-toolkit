@@ -1,0 +1,161 @@
+//
+// Copyright 2018-2021, Juniper Networks, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+
+// [brief]: JET Common Package
+package jnx.jet.common;
+
+// [version]: 0.0.0
+import "jnx_common_base_types.proto";
+
+// [changes]: Added new message IpNetwork and two new AfTypes.
+option (jnx.jet.common.japi_version) = "0.2.0";
+
+option (jnx.jet.common.junos_release) = "19.4";
+
+// [brief]: Network address format used by server
+// [detail]: The format of network addresses that the server is to use when
+// responding to client requests.
+// [default]: ADDRESS_STRING
+enum AddressFormat {
+    // [brief]: Addreses in replies will be represented by strings
+    ADDRESS_STRING  = 0;
+
+    // [brief]: Addreses in replies represented by binary data in byte arrays
+    ADDRESS_BYTES   = 1;
+}
+
+// [brief]: Address family of a network address.
+// [detail]: Address family of a network address.
+// [default]: AF_UNSPECIFIED
+enum AfType {
+    // [brief]: Not specified
+    AF_UNSPECIFIED = 0;
+    // [brief]: IPv4 address family
+    AF_INET        = 1;
+    // [brief]: IPv6 address family
+    AF_INET6       = 2;
+    // [brief]: Ethernet MAC address family
+    AF_MAC         = 3;
+    // [brief]: mpls address family
+    AF_MPLS        = 4;
+    // [brief]: iso address family
+    AF_ISO         = 5;
+}
+
+// [brief]: IP Address representation
+// [detail]: An IP address, which may be either IPv4 or IPv6 and be respresented
+// by either a string or array of binary bytes.
+message IpAddress {
+    // [brief]: IP address format
+    oneof addr_format {
+        // [brief]: IP address string in standard format
+        string        addr_string     = 1;
+        // [brief]: Binary IP address in network-ordered array of bytes
+        bytes         addr_bytes      = 2;
+    }
+}
+
+// [brief]: Mac Address representation
+// [detail]: An ethernet MAC address, which may be respresented by either a
+// string or array of binary bytes.
+message MacAddress {
+    // [brief]: MAC Address format
+    oneof addr_format {
+        // [brief]: MAC address string in standard format
+        string        addr_string     = 1;
+
+        // [brief]: Binary MAC address in network-ordered array of bytes
+        bytes         addr_bytes      = 2;
+    }
+}
+
+// [brief]: Network IP Address representation
+// [detail]: An IP address, which may be either IPv4 or IPv6 and be represented
+// by either a string or array of binary bytes.
+// The prefix_len field should be used to specify the prefix length of the
+// address.
+message IpNetwork {
+    // [brief]: Only the host address should be provided using this.
+    oneof addr_format {
+        // [brief]: Host address in string format
+        string   host_addr_string     = 1;
+        // [brief]: Host address  in network-ordered array of bytes
+        bytes    host_addr_bytes      = 2;
+    }
+    // [brief]: Prefix length for the address.
+    // [detail]: This field is optional.
+    uint32       prefix_len           = 3;
+}
+
+// [brief]: TCP Flags.
+// [detail]: TCP flags for which TCP header can be matched.
+// [default]: TCP_FLAG_INVALID
+enum TcpFlags {
+    // [brief]: Invalid flag. This flag is not used.
+    TCP_FLAG_INVALID = 0;
+    // [brief]: TCP Finished flag.
+    TCP_FLAG_FIN     = 1;
+    // [brief]: TCP Synchronisation flag.
+    TCP_FLAG_SYN     = 2;
+    // [brief]: TCP Reset flag.
+    TCP_FLAG_RST     = 4;
+    // [brief]: TCP push flag.
+    TCP_FLAG_PUSH    = 8;
+    // [brief]: TCP acknowledgement flag.
+    TCP_FLAG_ACK     = 16;
+    // [brief]: TCP Urgent flag.
+    TCP_FLAG_URGENT  = 32;
+}
+
+// [brief]: IP Fragmentation flags.
+// [detail]: This is used to set or unset the IP fragmentation
+// flags. All flags are optional.
+message IpFragementFlags {
+    // [brief]: The IP fragments do not match.
+    // [default_value]: FALSE
+    bool  not_match       = 1;
+    // [brief]: The IP fragments match.
+    // [default_value]: FALSE
+    bool  match           = 2;
+    // [brief]: If this flag is set, the packets are not fragmented.
+    // [default_value]: FALSE
+    bool  dont_fragement  = 3;
+    // [brief]: This indicates whether the packet is a fragment.
+    // [default_value]: FALSE
+    bool  is_a_fragement  = 4;
+    // [brief]: This indicates whether the packet is first fragment.
+    // [default_value]: FALSE
+    bool  first_fragement = 5;
+    // [brief]: This indicates that the packet is the last fragment.
+    // [default_value]: FALSE
+    bool  last_fragement  = 6;
+}
+
+// [brief]: Type of tunnel.
+// [detail]: This is used to set the type of tunnel
+message BypassOrTerminate {
+    // [brief]: type of tunnel
+    // [detail]: tunnel type can be either bypass_loopback or
+    // tunnel_terrmination
+    oneof tunnel_type {
+        // [brief]: tunnel is byass_loopback type
+        bool        bypass_loopback            = 1;
+        // [brief]: tunnel is tunnel_terminate type
+        bool        tunnel_terminate           = 2;
+    }
+}

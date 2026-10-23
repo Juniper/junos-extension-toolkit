@@ -1,0 +1,102 @@
+/*
+ * $Id$
+ *
+ * Copyright (c) 2024, Juniper Networks, Inc.
+ * All rights reserved.
+ */
+
+syntax = "proto3";
+import "jnx_addr.proto";
+
+package rmop;
+
+// [brief]: single SR-MPLS hop configuration parameters
+// [detail]: single SR-MPLS hop configuration parameters
+message SrMplsHopCfg {
+    // [mandatory]:
+    // [brief]: a valid 20-bit unsigned label value in the range 16-1048575
+    uint32 label                               = 1;
+
+    // [brief]: traffic class as a 3-bit EXP value in the range 0-7
+    uint32 traffic_class                       = 2;
+
+    // [brief]: 8-bit time-to-live value in the range 1-255
+    uint32 ttl                                 = 3;
+}
+
+// [brief]: SR-MPLS path configuration as a sequence of SR-MPLS hops
+// [detail]: SR-MPLS path configuration as a sequence of SR-MPLS hops
+message SrMplsPathCfg {
+    // [mandatory]:
+    // [brief]: sequence of SR-MPLS hops to be followed along the path
+    repeated SrMplsHopCfg srmpls_hops          = 1;
+}
+
+// [brief]: single SRv6 hop configuration parameters
+// [detail]: single SRv6 hop configuration parameters
+message SrV6HopCfg {
+    // [mandatory]:
+    // [brief]: IPv6 node segment identifier (SID)
+    jnxBase.IpAddress sid                      = 1;
+}
+
+// [brief]: SRv6 path configuration as a sequence of SRv6 hops
+// [detail]: SRv6 path configuration as a sequence of SRv6 hops
+message SrV6PathCfg {
+    // [mandatory]:
+    // [brief]: sequence of SRv6 hops to be followed along the path
+    repeated SrV6HopCfg srv6_hops              = 1;
+}
+
+// [brief]: generic path configuration
+// [detail]: generic path configuration
+message PathCfg {
+    // [mandatory]:
+    // [brief]: path type
+    oneof path_type {
+        // [brief]: SR-MPLS path configuratoin
+        SrMplsPathCfg srmpls_path              = 1;
+
+        // [brief]: SRv6 path configuratoin
+        SrV6PathCfg srv6_path                  = 2;
+    }
+}
+
+message Measurements {
+    uint32 sent                                = 1;
+    uint32 rcvd                                = 2;
+    uint32 rtt_samples                         = 3;
+    uint32 rtt_min                             = 4;
+    uint32 rtt_max                             = 5;
+    uint32 rtt_avg                             = 6;
+    uint32 egress_delay_samples                = 7;
+    uint32 egress_delay_min                    = 8;
+    uint32 egress_delay_max                    = 9;
+    uint32 egress_delay_avg                    = 10;
+    uint32 ingress_delay_samples               = 11;
+    uint32 ingress_delay_min                   = 12;
+    uint32 ingress_delay_max                   = 13;
+    uint32 ingress_delay_avg                   = 14;
+    uint32 egress_jitter_samples               = 15;
+    uint32 egress_jitter_min                   = 16;
+    uint32 egress_jitter_max                   = 17;
+    uint32 egress_jitter_avg                   = 18;
+    uint32 ingress_jitter_samples              = 19;
+    uint32 ingress_jitter_min                  = 20;
+    uint32 ingress_jitter_max                  = 21;
+    uint32 ingress_jitter_avg                  = 22;
+}
+
+message PmVariance {
+    uint32 min_variance                        = 1;
+    uint32 max_variance                        = 2;
+    uint32 avg_variance                        = 3;
+}
+
+message PmSubscribeSettings {
+    PmVariance rtt                             = 1;
+    PmVariance egress_delay                    = 2;
+    PmVariance ingress_delay                   = 3;
+    PmVariance egress_jitter                   = 4;
+    PmVariance ingress_jitter                  = 5;
+}
